@@ -1,0 +1,14 @@
+#ifndef GAMESTATUS_H
+#define GAMESTATUS_H
+
+namespace game_1vs1
+{
+typedef enum
+{
+  ONGOING,
+  WIN_FAIR, WIN_TIMEOUT, WIN_DISCONNECT,
+  LOSE_FAIR, LOSE_TIMEOUT, LOSE_DISCONNECT
+} Status;
+}
+
+#endif // GAMESTATUS_H

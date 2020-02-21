@@ -1,0 +1,14 @@
+#ifndef DUELS_GAMESTATE_H
+#define DUELS_GAMESTATE_H
+
+namespace duels
+{
+ enum class State
+{
+  ONGOING,
+  WIN_FAIR, WIN_TIMEOUT, WIN_DISCONNECT,
+  LOSE_FAIR, LOSE_TIMEOUT
+};
+}
+
+#endif // DUELS_GAMESTATE_H

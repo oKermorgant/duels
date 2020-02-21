@@ -1,0 +1,5 @@
+timeout: 100 #ms
+init: [int x1, int y1, int x2, int y2, int yb(640), int radius]
+input: [float angle, float force]
+feedback: [int x, int y, int xo, int yo, int xb, int yb, int wind]
+display: [float x, float y, bool hit]
