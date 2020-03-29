@@ -35,13 +35,13 @@ std::string tcp_transport(int port = 0)
 
 enum class Player {One, Two};
 
-template <class InitMsg, class InputMsg, class FeedbackMsg, class DisplayMsg, int timeout>
+template <class initMsg, class inputMsg, class feedbackMsg, class displayMsg, int timeout, int refresh>
 class Server
 {
   struct Listener
   {
   public:
-    InputMsg input;
+    inputMsg input;
     Client status = Client::OK;
 
     std::unique_ptr<std::condition_variable> cv;
@@ -94,7 +94,7 @@ class Server
       }
     }
 
-    void send(const FeedbackMsg &msg)
+    void send(const feedbackMsg &msg)
     {
       printSrv("Sending feedback");
       zmq::message_t zmsg(&msg, sizeof(msg));
@@ -115,7 +115,7 @@ class Server
       }
     }
 
-    void read(InputMsg &msg, int _timeout = 2*timeout)
+    void read(inputMsg &msg, int _timeout = 2*timeout)
     {
       zmq::message_t zmsg;
       zmq::poll(&poll_in, 1, _timeout);
@@ -126,13 +126,13 @@ class Server
         if(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
            > timeout)
           status = Client::TIMEOUT;
-        msg = *(static_cast<InputMsg*>(zmsg.data()));
+        msg = *(static_cast<inputMsg*>(zmsg.data()));
       }
       else
         status = Client::DISCONNECT;
     }
 
-    void sendResult(FeedbackMsg &msg)
+    void sendResult(feedbackMsg &msg)
     {
       // try to read if misdetected disconnect
       if(status == Client::DISCONNECT)
@@ -145,7 +145,7 @@ class Server
         send(msg);
     }
 
-    Client waitForInput(InputMsg &ret)
+    Client waitForInput(inputMsg &ret)
     {
       printSrv("waitForInput");
       if(use_thread)
@@ -187,7 +187,8 @@ public:
     return 0;     // online game, no difficulty
   }
 
-  Server(int argc, char** argv, DisplayMsg &_display, const InitMsg &init_msg) : display(_display), sock(ctx, zmq::socket_type::pub)
+  Server(int argc, char** argv, displayMsg &_display, const initMsg &init_msg)
+    : display(_display), sock(ctx, zmq::socket_type::pub), refresh_ms(refresh)
   {
     // register player names and base port
     // name1 [name2] [port]
@@ -237,6 +238,11 @@ public:
     printSrv("display ready");
   }
 
+  double samplingTime() const
+  {
+    return refresh*0.001;
+  }
+
   bool hasTwoPlayers() const
   {
     return difficulty == 0;
@@ -247,7 +253,7 @@ public:
     return difficulty;
   }
 
-  bool sync(const Player &player, const FeedbackMsg &msg, InputMsg &player_input)
+  bool sync(const Player &player, const feedbackMsg &msg, inputMsg &player_input)
   {
     const auto &p = (player == Player::One)?p1:p2;
     p->send(msg);
@@ -255,13 +261,13 @@ public:
     return msg.state == State::ONGOING && state == Client::OK;
   }
 
-  bool sync(const FeedbackMsg &msg, InputMsg &player_input)
+  bool sync(const feedbackMsg &msg, inputMsg &player_input)
   {
     return sync(Player::One, msg, player_input);
   }
 
-  bool sync(const FeedbackMsg &msg1, InputMsg &player1_input,
-            const FeedbackMsg &msg2, InputMsg &player2_input)
+  bool sync(const feedbackMsg &msg1, inputMsg &player1_input,
+            const feedbackMsg &msg2, inputMsg &player2_input)
   {
     // inform players anyway
     p1->send(msg1);
@@ -276,7 +282,7 @@ public:
         && status2 == Client::OK;
   }
 
-  void registerVictory(const Player &player, FeedbackMsg &msg1, FeedbackMsg &msg2)
+  void registerVictory(const Player &player, feedbackMsg &msg1, feedbackMsg &msg2)
   {
     if(player == Player::One)
     {
@@ -290,7 +296,7 @@ public:
     }
   }
 
-  void sendResult(FeedbackMsg &msg1, FeedbackMsg &msg2)
+  void sendResult(feedbackMsg &msg1, feedbackMsg &msg2)
   {
     if(p1->status == Client::TIMEOUT)
     {
@@ -325,6 +331,8 @@ public:
 
   void sendDisplay(int winner = 0)
   {
+    std::this_thread::sleep_until(refresh_last + refresh_ms);
+    refresh_last = std::chrono::steady_clock::now();
     printSrv("Sending display");
     const std::string msg(display.toYAMLString(winner));
     zmq::message_t zmsg(msg.data(), msg.length());
@@ -337,7 +345,10 @@ private:
   zmq::context_t ctx;
   zmq::socket_t sock;
   int difficulty = 0;
-  DisplayMsg &display;
+  displayMsg &display;
+
+  std::chrono::steady_clock::time_point refresh_last = std::chrono::steady_clock::now();
+  const std::chrono::milliseconds refresh_ms;
 };
 }
 

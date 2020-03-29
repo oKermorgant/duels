@@ -7,7 +7,7 @@ set(CMAKE_BUILD_TYPE Debug)
 # find ZeroMQ
 find_path ( ZMQ_INCLUDE_DIR zmq.h )
 find_library ( ZMQ_LIBRARY NAMES zmq )
-include_directories(/home/olivier/code/projects/duels/opt/duels//include ../include ${ZMQ_INCLUDE_DIR})
+include_directories(/home/olivier/code/projects/duels/duels//include ../include ${ZMQ_INCLUDE_DIR})
 
 # add whatever additional includes / libs needed for your AI
 

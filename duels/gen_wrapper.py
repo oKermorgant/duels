@@ -37,7 +37,8 @@ def msg_derived(name, keys, field):
     l = len(keys)
     detail = [Info(key) for key in keys]
     ret = 'struct {}\n{{\n'.format(name)
-    ret += '  {};\n'.format('; '.join(keys))
+    if len(keys):
+        ret += '  {};\n'.format('; '.join(keys))
     if field == 'display':
         ret += build_toYAMLString(detail, ['int winner'])
     if field == 'init':
@@ -50,10 +51,8 @@ def msg_derived(name, keys, field):
         ret += '  State state = State::ONGOING;\n'
     return ret + '};\n'
 
-def build_headers(game, config, game_path, path):
-    with open(config) as f:
-        content = yaml.safe_load(f)
-    
+def build_headers(game, description, game_path, path):
+
     include_path = game_path + 'include/duels/'+game
     guard = game.upper() + '_MSG_H'
 
@@ -65,8 +64,8 @@ def build_headers(game, config, game_path, path):
     
     names = []
     for field in ('init', 'input', 'feedback', 'display'):
-        names.append(field.title()+'Msg')
-        header.append(msg_derived(names[-1], content[field], field))
+        names.append(field+'Msg')
+        header.append(msg_derived(names[-1], description[field], field))
         
     header.append('}\n}\n#endif')
     with open(include_path + '/msg.h', 'w') as f:
@@ -81,7 +80,7 @@ def build_headers(game, config, game_path, path):
 #include <sstream>
 namespace duels {{
 namespace {game} {{
-class Game: public duels::Client<InputMsg, FeedbackMsg>
+class Game: public duels::Client<inputMsg, feedbackMsg>
 {{
 public:
   Game(std::string name = "Player")
@@ -92,15 +91,20 @@ public:
       : Game(name, 1, ip) {{}}
 private:
   Game(std::string name, int difficulty, std::string ip)
-      : duels::Client<InputMsg, FeedbackMsg>(
-      100, name, difficulty, ip, "{game}",
+      : duels::Client<inputMsg, feedbackMsg>(
+      {timeout}, name, difficulty, ip, "{game}",
       "{path}bin/") {{}}
 }};
 }}
 }}
 #endif'''
     with open(include_path + '/game.h', 'w') as f:
-        f.write(header.format(guard=guard, game=game, path=path))
+        f.write(header.format(guard=guard, game=game, path=path, timeout=description['timeout']))
+        
+def dict_replace(s, d):
+    for key in d:
+        s = s.replace('<'+key+'>', str(d[key]))
+    return s
 
 if __name__ == '__main__':
     path = os.path.abspath(os.path.dirname(__file__)) + '/'
@@ -111,20 +115,30 @@ if __name__ == '__main__':
     game_path = len(sys.argv) == 2 and sys.argv[1] or '.'
     game_path = os.path.abspath(game_path) + '/'
 
+    description_file = ''
     for msg in os.listdir(game_path):
         if msg.endswith('.yaml'):
-            config = game_path + msg
+            description_file = game_path + msg
             game = msg.split('.')[0].lower()
             break
+        
+    if description_file == '':
+        print('Could not find any game description file in {}'.format(game_path))
+        sys.exit(0)
+    
+    with open(description_file) as f:
+        description = yaml.safe_load(f)
+    for key,val in (('timeout', 100), ('refresh', 20), ('game', game), ('duels_path', path)):
+        if key not in description:
+            description[key] = val
         
     # create directories
     for d in ('include', 'include/duels', 'include/duels/'+game, 'client_template'):
         if not os.path.exists(game_path + d):
             os.mkdir(game_path + d)
             
-    # generate headers
-    build_headers(game, config, game_path, path)
-
+    build_headers(game, description, game_path, path)
+    
     # copy server templates
     for src in ('CMakeLists.txt', 'server.cpp', 'gui.py'):
         dst_path = game_path + src
@@ -136,7 +150,7 @@ if __name__ == '__main__':
             with open(path + 'templates/server/' + src) as f:
                 content = f.read()
             with open(dst_path, 'w') as f:
-                f.write(content.replace('<game>', game).replace('<duels_path>', path))
+                f.write(dict_replace(content, description))
                 
     # copy client templates
     for src,dst in (('CMakeLists.txt','CMakeLists.txt'), ('game.cpp', game+'.cpp')):
@@ -147,4 +161,4 @@ if __name__ == '__main__':
             with open(path + 'templates/client/' + src) as f:
                 content = f.read()
             with open(dst_path, 'w') as f:
-                f.write(content.replace('<game>', game).replace('<duels_path>', path))
+                f.write(dict_replace(content, description))

@@ -4,7 +4,7 @@
 
 using duels::Player;
 using namespace duels::gorilla;
-using Game = duels::Server<InitMsg, InputMsg, FeedbackMsg, DisplayMsg, 1000>;
+using Game = duels::Server<InitMsg, InputMsg, FeedbackMsg, DisplayMsg, 1000, 20>;
 
 int main(int argc, char** argv)
 {

@@ -14,12 +14,12 @@ void print(std::string msg)
   std::cout << "Client -> " << msg << std::endl;
 }}
 
-template <class InputMsg, class FeedbackMsg>
+template <class inputMsg, class feedbackMsg>
 class Client
 {
 private:
-  InputMsg input;
-  FeedbackMsg feedback;
+  inputMsg input;
+  feedbackMsg feedback;
   zmq::context_t ctx;
   zmq::socket_t sock;
 
@@ -79,19 +79,19 @@ public:
     sock.connect(ss.str());
   }
 
-  bool get(FeedbackMsg &msg)
+  bool get(feedbackMsg &msg)
   {
     print("waiting for feedback");
     zmq::message_t zmsg;
     sock.recv(zmsg);
-    msg = *(static_cast<FeedbackMsg*>(zmsg.data()));
+    msg = *(static_cast<feedbackMsg*>(zmsg.data()));
     if(msg.state == State::ONGOING) print("feedback = State::ONGOING");
     if(msg.state == State::LOSE_TIMEOUT) print("feedback = TIMEOUT");
 
     return msg.state == State::ONGOING;
   }
 
-  void send(const InputMsg &msg)
+  void send(const inputMsg &msg)
   {
     print("sending input");
     zmq::message_t zmsg(&msg, sizeof(msg));
