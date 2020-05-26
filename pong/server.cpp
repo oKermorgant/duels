@@ -3,14 +3,14 @@
 
 using duels::Player;
 using namespace duels::pong;
-using Game = duels::Server<initMsg, inputMsg, feedbackMsg, displayMsg, 100, 20>;
+using Game = duels::Server<InitMsg, InputMsg, FeedbackMsg, DisplayMsg, 1000>;
 
 int main(int argc, char** argv)
 {
-  feedbackMsg feedback1, feedback2;
-  initMsg init;
-  inputMsg input1, input2;
-  displayMsg display;
+  FeedbackMsg feedback1, feedback2;
+  InitMsg init;
+  InputMsg input1, input2;
+  DisplayMsg display;
 
   // prepare init message
   
@@ -19,7 +19,7 @@ int main(int argc, char** argv)
   const bool two_players = game.hasTwoPlayers();
 
   // simulation time
-  const double dt(game.samplingTime());
+  const uint dt_ms(100);
 
 
 
@@ -40,8 +40,7 @@ int main(int argc, char** argv)
 
     // build display information
 
-    game.sendDisplay();
-    
+
     // build player 1 feedback
 
 
@@ -49,8 +48,6 @@ int main(int argc, char** argv)
 
 
 
-
-    
     if(two_players)
     {
       if(!game.sync(feedback1, input1, feedback2, input2))
@@ -66,6 +63,9 @@ int main(int argc, char** argv)
 
     }
     // update game state from input1 and input2
+
+
+    game.wait(dt_ms);
   }
 
   game.sendResult(feedback1, feedback2);

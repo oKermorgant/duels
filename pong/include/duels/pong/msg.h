@@ -4,8 +4,9 @@
 #include <duels/game_state.h>
 namespace duels {
 namespace pong {
-struct initMsg
+struct InitMsg
 {
+  ;
   std::string toYAMLString(std::string p1, std::string p2) const 
   {
     std::stringstream ss;
@@ -15,21 +16,21 @@ struct initMsg
   }
 };
 
-struct inputMsg
+struct InputMsg
 {
   double v;
 };
 
-struct feedbackMsg
+struct FeedbackMsg
 {
   double y1; double y2; double x; double y;
-  feedbackMsg() {}
-  feedbackMsg(double _y1, double _y2, double _x, double _y)
+  FeedbackMsg() {}
+  FeedbackMsg(double _y1, double _y2, double _x, double _y)
     : y1(_y1), y2(_y2), x(_x), y(_y) {}
   State state = State::ONGOING;
 };
 
-struct displayMsg
+struct DisplayMsg
 {
   double y1; double y2; double x; double y;
   std::string toYAMLString(int winner) const 

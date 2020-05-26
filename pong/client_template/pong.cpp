@@ -6,8 +6,8 @@ int main()
 {
   Game game;
 
-  inputMsg input;
-  feedbackMsg feedback;
+  InputMsg input;
+  FeedbackMsg feedback;
   const auto timeout = game.timeout;
 
   while(game.get(feedback))

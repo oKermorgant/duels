@@ -5,7 +5,7 @@
 #include <sstream>
 namespace duels {
 namespace pong {
-class Game: public duels::Client<inputMsg, feedbackMsg>
+class Game: public duels::Client<InputMsg, FeedbackMsg>
 {
 public:
   Game(std::string name = "Player")
@@ -16,9 +16,9 @@ public:
       : Game(name, 1, ip) {}
 private:
   Game(std::string name, int difficulty, std::string ip)
-      : duels::Client<inputMsg, feedbackMsg>(
+      : duels::Client<InputMsg, FeedbackMsg>(
       100, name, difficulty, ip, "pong",
-      "/home/olivier/code/projects/duels/duels/bin/") {}
+      "/home/olivier/code/projects/duels/opt/duels/bin/") {}
 };
 }
 }
