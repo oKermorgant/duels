@@ -87,11 +87,6 @@ public:
     sock.send(zmsg, zmq::send_flags::none);
   }
 
-  void printResult()
-  {
-
-
-  }
 };
 
 

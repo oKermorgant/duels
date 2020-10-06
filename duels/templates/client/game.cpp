@@ -18,5 +18,4 @@ int main()
 
     game.send(input);
   }
-  game.printResult();
 }

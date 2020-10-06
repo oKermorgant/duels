@@ -5,13 +5,13 @@
 
 namespace duels
 {
-int fastrand_seed = 0;
+static int fastrand_seed = 0;
 
 namespace{
 constexpr static float rand_denum(1.f/32767);
 }
 
-void randseed()
+inline void randseed()
 {
   fastrand_seed = static_cast<int>(time(nullptr));
 }
