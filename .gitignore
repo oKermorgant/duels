@@ -1,6 +1,7 @@
 # OK general gitignore
 
 opt/
+debian/
 
 # Compiled source #
 ###################

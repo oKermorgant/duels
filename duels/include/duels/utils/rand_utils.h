@@ -5,9 +5,8 @@
 
 namespace duels
 {
-static int fastrand_seed = 0;
-
 namespace{
+static int fastrand_seed = time(nullptr);
 constexpr static float rand_denum(1.f/32767);
 }
 
