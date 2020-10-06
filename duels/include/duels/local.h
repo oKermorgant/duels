@@ -46,6 +46,11 @@ public:
     difficulty = level;
   }
 
+  int level() const
+  {
+    return difficulty;
+  }
+
   LocalGame() : sock(ctx, zmq::socket_type::pub), refresh_ms(refresh) {}
 
   void initDisplay(const initMsg &init_msg, const std::string &game, const std::string &gui_path = std::string(DUELS_ROOT) + "/bin/")
