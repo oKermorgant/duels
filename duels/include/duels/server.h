@@ -17,12 +17,6 @@ namespace duels
 namespace
 {
 
-template <typename V>
-void printSrv(V msg)
-{
-  std::cout << "                             Server -> " << msg << std::endl;
-}
-
 enum class Client{OK, TIMEOUT, DISCONNECT};
 
 std::string tcp_transport(int port = 0)
@@ -82,21 +76,17 @@ class Server
       while(status == Client::OK)
       {
         // wait for listening notification
-        printSrv("Loop waiting to listen");
         std::unique_lock<std::mutex> lk(*mtx);
         cv->wait(lk, [this](){return listening;});
 
-        printSrv("Loop waiting for input");
         read(input);
         listening = false;
-        std::cout << "Loop has read input" << std::endl;
         cv->notify_one();
       }
     }
 
     void send(const feedbackMsg &msg)
     {
-      printSrv("Sending feedback");
       zmq::message_t zmsg(&msg, sizeof(msg));
       zmq::poll(&poll_out, 1, timeout);
       if(!(poll_out.revents & ZMQ_POLLOUT))
@@ -136,10 +126,8 @@ class Server
     {
       // try to read if misdetected disconnect
       if(status == Client::DISCONNECT)
-      {
-        printSrv("read again before sending?");
         read(input, 2*timeout);
-      }
+      
       msg.state = State::LOSE_TIMEOUT;
       if(status != Client::DISCONNECT)
         send(msg);
@@ -147,7 +135,6 @@ class Server
 
     Client waitForInput(inputMsg &ret)
     {
-      printSrv("waitForInput");
       if(use_thread)
       {
         std::unique_lock<std::mutex> lck(*mtx);
@@ -156,12 +143,6 @@ class Server
       else
         read(ret);
 
-      if(status == Client::OK)
-        printSrv("input OK");
-      else if(status == Client::TIMEOUT)
-        printSrv("Timeout");
-      else
-        printSrv("Disconnect");
       return status;
     }
   };
@@ -187,16 +168,17 @@ public:
     return 0;     // online game, no difficulty
   }
 
-  Server(int argc, char** argv, displayMsg &_display, const initMsg &init_msg)
-    : display(_display), sock(ctx, zmq::socket_type::pub), refresh_ms(refresh)
+  Server() : sock(ctx, zmq::socket_type::pub), refresh_ms(refresh) {}
+
+  void initDisplay(int argc, char** argv, const initMsg &init_msg)
   {
     // register player names and base port
     // name1 [name2] [port]
-    // +0 -> p1
-    // +1 -> p2
-    // +2 -> displays
-    // +3 -> shake display 1
-    // +4 -> shake display 2
+    // +0 -> p1 in
+    // +1 -> p2 in
+    // +2 -> displays out
+    // +3 -> shake display 1 in
+    // +4 -> shake display 2 in
     std::string name1("Player"), name2("Bot");
     difficulty = parseLevel(argc, argv);
 
@@ -210,7 +192,6 @@ public:
       port = atoi(argv[3]);
       // make sure base port is player 1 port
       port -= (port % 4);
-      printSrv("Two players");
     }
 
     // wait for clients
@@ -222,20 +203,16 @@ public:
     const std::string req(init_msg.toYAMLString(name1, name2));
 
     sock.bind(tcp_transport(port+2));
-    printSrv("Publishing to " + tcp_transport(port+2));
     for(int i = 0; i < (hasTwoPlayers()?2:1); ++i)
     {
       zmq::socket_t shake(ctx, zmq::socket_type::req);
       shake.bind(tcp_transport(port+3+i));
-      printSrv("Sending names @ " + tcp_transport(port+3+i));
       zmq::message_t zmsg(req.data(), req.length());
       shake.send(zmsg, zmq::send_flags::none);
-      printSrv("waiting for display resp");
       shake.recv(zmsg);
       shake.close();
       wait(100);
     }
-    printSrv("display ready");
   }
 
   double samplingTime() const
@@ -296,7 +273,7 @@ public:
     }
   }
 
-  void sendResult(feedbackMsg &msg1, feedbackMsg &msg2)
+  void sendResult(const displayMsg &display, feedbackMsg &msg1, feedbackMsg &msg2)
   {
     if(p1->status == Client::TIMEOUT)
     {
@@ -313,11 +290,10 @@ public:
     else if(p2->status == Client::DISCONNECT)
       msg1.state = State::WIN_DISCONNECT;
 
-    printSrv("Sending final results");
     if(msg1.state == State::WIN_FAIR || msg1.state == State::WIN_TIMEOUT || msg1.state == State::WIN_DISCONNECT)
-      sendDisplay(1);
+      sendDisplay(display, 1);
     else
-      sendDisplay(2);
+      sendDisplay(display, 2);
 
     p1->sendResult(msg1);
     if(hasTwoPlayers())
@@ -329,11 +305,10 @@ public:
     std::this_thread::sleep_for(std::chrono::milliseconds(ms));
   }
 
-  void sendDisplay(int winner = 0)
+  void sendDisplay(const displayMsg &display, int winner = 0)
   {
     std::this_thread::sleep_until(refresh_last + refresh_ms);
     refresh_last = std::chrono::steady_clock::now();
-    printSrv("Sending display");
     const std::string msg(display.toYAMLString(winner));
     zmq::message_t zmsg(msg.data(), msg.length());
     sock.send(zmsg, zmq::send_flags::none);
@@ -345,7 +320,6 @@ private:
   zmq::context_t ctx;
   zmq::socket_t sock;
   int difficulty = 0;
-  displayMsg &display;
 
   std::chrono::steady_clock::time_point refresh_last = std::chrono::steady_clock::now();
   const std::chrono::milliseconds refresh_ms;

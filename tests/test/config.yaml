@@ -1,3 +1,0 @@
-input: [v, w]
-feedback: [x, y]
-display: [x, y, theta]

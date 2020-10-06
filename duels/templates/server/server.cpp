@@ -1,9 +1,20 @@
+#define LOCAL_GAME  // to test the game AI with a dumb player AI
+
 #include <duels/<game>/msg.h>
+#ifdef LOCAL_GAME
+#include <duels/local.h>
+#else
 #include <duels/server.h>
+#endif
 
 using duels::Player;
 using namespace duels::<game>;
-using Game = duels::Server<initMsg, inputMsg, feedbackMsg, displayMsg, <timeout>, <refresh>>;
+#ifdef LOCAL_GAME
+using GameIO = duels::LocalGame<initMsg, inputMsg, feedbackMsg, displayMsg, <timeout>, <refresh>>;
+#else
+using GameIO = duels::Server<initMsg, inputMsg, feedbackMsg, displayMsg, <timeout>, <refresh>>;
+#endif
+
 
 int main(int argc, char** argv)
 {
@@ -11,19 +22,25 @@ int main(int argc, char** argv)
   initMsg init;
   inputMsg input1, input2;
   displayMsg display;
-
-  // prepare init message
-  
-
-  Game game(argc, argv, display, init);
-  const bool two_players = game.hasTwoPlayers();
-
+  GameIO game_io;
   // simulation time
-  const double dt(game.samplingTime());
-
-
+  const double dt(game_io.samplingTime());
 
   // build initial game state
+
+  
+  
+
+  // build init message for display
+  
+
+#ifdef LOCAL_GAME
+  game_io.initDisplay(init, "<game>");
+  game_io.setLevel(1);
+#else
+  game_io.initDisplay(argc, argv, init);
+  const bool two_players = game_io.hasTwoPlayers();
+#endif
 
 
   while(true)
@@ -32,15 +49,15 @@ int main(int argc, char** argv)
     if(false)
     {
       //if(...)
-      game.registerVictory(Player::One, feedback1, feedback2);
+      game_io.registerVictory(Player::One, feedback1, feedback2);
       //else
-      game.registerVictory(Player::One, feedback1, feedback2);
+      game_io.registerVictory(Player::Two, feedback1, feedback2);
     }
 
 
     // build display information
 
-    game.sendDisplay();
+    game_io.sendDisplay(display);
     
     // build player 1 feedback
 
@@ -50,23 +67,38 @@ int main(int argc, char** argv)
 
 
 
-    
+#ifndef LOCAL_GAME
     if(two_players)
     {
-      if(!game.sync(feedback1, input1, feedback2, input2))
+      if(!game_io.sync(feedback1, input1, feedback2, input2))
         break;
     }
     else
     {
       // sync with player 1, exits if needed
-      if(!game.sync(feedback1, input1))
+      if(!game_io.sync(feedback1, input1))
         break;
+
+
+#else
+      // write dumb player AI from feedback1 to input1
+
+
+#endif
+
+
+
+
+
       // artificial opponent: put your AI here
 
-
+#ifndef LOCAL_GAME
     }
+#endif
+
     // update game state from input1 and input2
   }
 
-  game.sendResult(feedback1, feedback2);
+  // final results
+  game_io.sendResult(display, feedback1, feedback2);
 }

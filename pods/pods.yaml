@@ -1,5 +1,0 @@
-timeout: 100 #ms
-input: [float v, float w]
-feedback: [float x, float y, float t]
-display: [float x1, float y1, float t1]
-display: display.py # or C++ target

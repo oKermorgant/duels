@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <iostream>
 
-#include <duels/algo/rand_utils.h>
+#include <duels/utils/rand_utils.h>
 
 namespace duels
 {

@@ -8,12 +8,6 @@
 namespace duels
 {
 
-namespace {
-void print(std::string msg)
-{
-  std::cout << "Client -> " << msg << std::endl;
-}}
-
 template <class inputMsg, class feedbackMsg>
 class Client
 {
@@ -26,7 +20,7 @@ private:
 public:
   const int timeout;
 
-  Client(int _timeout, std::string name, int difficulty, std::string ip, std::string game, std::string duels_bin)
+  Client(int _timeout, std::string name, int difficulty, std::string ip, std::string game)
     : timeout(_timeout), sock(ctx, zmq::socket_type::rep)
   {
     int port(3000);
@@ -63,15 +57,14 @@ public:
 
       // launch local game
       std::stringstream ss;
-      ss << duels_bin << game << "_server " << name << " " << difficulty << " &";
+      ss << DUELS_ROOT << "/bin/" << game << "_server " << name << " " << difficulty << " &";
       system(ss.str().c_str());
     }
 
     // open display for this game
     std::stringstream ss;
-    ss << duels_bin << game << "_gui" << " " << ip << " " << port+3 << " &";
-    //print("Running " + ss.str());
-    //system(ss.str().c_str());
+    ss << DUELS_ROOT << "/bin/" << game << "_gui.py" << " " << DUELS_ROOT << " " << ip << " " << port+3 << " &";
+    system(ss.str().c_str());
 
     // connect to server as REP
     ss.str("");
@@ -81,19 +74,15 @@ public:
 
   bool get(feedbackMsg &msg)
   {
-    print("waiting for feedback");
     zmq::message_t zmsg;
     sock.recv(zmsg);
     msg = *(static_cast<feedbackMsg*>(zmsg.data()));
-    if(msg.state == State::ONGOING) print("feedback = State::ONGOING");
-    if(msg.state == State::LOSE_TIMEOUT) print("feedback = TIMEOUT");
 
     return msg.state == State::ONGOING;
   }
 
   void send(const inputMsg &msg)
   {
-    print("sending input");
     zmq::message_t zmsg(&msg, sizeof(msg));
     sock.send(zmsg, zmq::send_flags::none);
   }

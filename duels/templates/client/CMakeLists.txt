@@ -1,13 +1,16 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(<game> CXX)
 
+SET(DUELS_ROOT "<duels_path>" CACHE STRING "Path to duels installation folder")
+
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_BUILD_TYPE Debug)
 
 # find ZeroMQ
 find_path ( ZMQ_INCLUDE_DIR zmq.h )
 find_library ( ZMQ_LIBRARY NAMES zmq )
-include_directories(<duels_path>/include ../include ${ZMQ_INCLUDE_DIR})
+include_directories(${DUELS_ROOT}/include ../include ${ZMQ_INCLUDE_DIR})
+add_definitions(-DDUELS_ROOT="${DUELS_ROOT}")
 
 # add whatever additional includes / libs needed for your AI
 

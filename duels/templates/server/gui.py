@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import sys
-sys.path.insert(1, '<duels_path>')
+sys.path.insert(1, sys.argv[1])
 from duels import Subscriber
 
-sub = Subscriber()
-init_msg = sub.get_init()
+game = Subscriber()
+init_msg = game.get_init()
 
 # prepare initial state / display
 # init_msg.p1
@@ -12,10 +12,10 @@ init_msg = sub.get_init()
 # init_msg.<other fields>
 
 
-sub.ready()
+game.ready()
 
 while True:
-    msg = sub.refresh()
+    msg = game.refresh()
     if msg.winner:
         break
     
