@@ -66,7 +66,7 @@ public:
     system(ss.str().c_str());
 
     // send initial display info as rep-req
-    const std::string req(init_msg.toYAMLString("Player_AI", "Game_AI"));
+    const std::string req(init_msg.toYAMLString("Player_AI", "Game_AI [" + std::to_string(difficulty) + "]"));
 
     sock.bind(tcp_transport(port+2));
     zmq::socket_t shake(ctx, zmq::socket_type::req);

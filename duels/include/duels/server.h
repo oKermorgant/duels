@@ -179,7 +179,7 @@ public:
         // +2 -> displays out
         // +3 -> shake display 1 in
         // +4 -> shake display 2 in
-        std::string name1("Player"), name2("Bot");
+        std::string name1("Player"), name2("Bot [" + std::to_string(difficulty) + "]");
         difficulty = parseLevel(argc, argv);
 
         int port = 3000;
