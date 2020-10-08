@@ -18,7 +18,7 @@ Priority: optional
 Architecture: all
 Essential: no
 Installed-Size: $SIZE
-Depends: python3-pygame, libzmq3-dev
+Depends: python3-pygame, libzmq3-dev, python3-zmq
 Maintainer: olivier.kermorgant@ec-nantes.fr
 Description: The Duels package to practice game AI's" > "$DST/duels/DEBIAN/control"
 

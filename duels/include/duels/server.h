@@ -159,13 +159,31 @@ public:
         ctx.close();
     }
 
-    static int parseLevel(int argc, char** argv)
+    std::tuple<std::string, std::string, int> parseArgs(int argc, char** argv)
     {
-        if(argc == 1) // local game with default difficulty
-            return 1;
-        if(argc == 3) // local game with explicit difficulty
-            return atoi(argv[2]);
-        return 0;     // online game, no difficulty
+        std::string name1("Player"), name2;
+        int port(3000);
+
+        for(int arg = 0; arg < argc; arg++)
+        {
+            const std::string key(argv[arg]);
+            if(key == "-d")
+                difficulty = atoi(argv[++arg]);
+            else if(key == "-n1")
+                name1 = argv[++arg];
+            else if(key == "-n2")
+            {
+                difficulty = 0;
+                name2 = argv[++arg];
+            }
+            else if(key == "-p")
+                port = atoi(argv[++arg]);
+        }
+
+        if(difficulty)
+            name2 = "Bot [" + std::to_string(difficulty) + "]";
+
+        return {name1, name2, port - (port % 4)};
     }
 
     Server() : sock(ctx, zmq::socket_type::pub), refresh_ms(refresh) {}
@@ -173,26 +191,13 @@ public:
     void initDisplay(int argc, char** argv, const initMsg &init_msg)
     {
         // register player names and base port
-        // name1 [name2] [port]
+        // -n1 name1 [-n2 name2] [-p port] [-d difficulty]
         // +0 -> p1 in
         // +1 -> p2 in
         // +2 -> displays out
         // +3 -> shake display 1 in
         // +4 -> shake display 2 in
-        std::string name1("Player"), name2("Bot [" + std::to_string(difficulty) + "]");
-        difficulty = parseLevel(argc, argv);
-
-        int port = 3000;
-        if(argc > 1)  // possibly local game on port 3000
-            name1 = std::string(argv[1]);
-
-        if(argc == 4) // distant game
-        {
-            name2 = std::string(argv[2]);
-            port = atoi(argv[3]);
-            // make sure base port is player 1 port
-            port -= (port % 4);
-        }
+        auto [name1, name2, port] = parseArgs(argc, argv); {}
 
         // wait for clients
         p1 = std::make_unique<Listener>(ctx, tcp_transport(port), hasTwoPlayers());
@@ -323,7 +328,7 @@ private:
     std::unique_ptr<Listener> p1, p2;
     zmq::context_t ctx;
     zmq::socket_t sock;
-    int difficulty = 0;
+    int difficulty = 1;
 
     std::chrono::steady_clock::time_point refresh_last = std::chrono::steady_clock::now();
     const std::chrono::milliseconds refresh_ms;
