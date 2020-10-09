@@ -33,7 +33,7 @@ public:
             manager.connect("tcp://" + ip + ":2999");
 
             // send game and name
-            std::string req(game + " '" + name + "'");
+            std::string req(game + " " + name);
             zmq::message_t zreq(req.data(), req.length());
             manager.send(zreq, zmq::send_flags::none);
 
@@ -44,9 +44,14 @@ public:
             if(item.revents & ZMQ_POLLIN)
             {
                 manager.recv(zrep);
-                local_game = false;
                 std::stringstream ss(std::string(static_cast<char*>(zrep.data()), zrep.size()));
                 ss >> port;
+                if(port)
+                    local_game = false;
+                if(port % 5 == 0)
+                    std::cout << "Waiting for another player..." << std::endl;
+                else
+                    std::cout << "Joining a waiting player..." << std::endl;
             }
         }
 

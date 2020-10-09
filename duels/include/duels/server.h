@@ -183,7 +183,7 @@ public:
         if(difficulty)
             name2 = "Bot [" + std::to_string(difficulty) + "]";
 
-        return {name1, name2, port - (port % 4)};
+        return {name1, name2, port - (port % 5)};
     }
 
     Server() : sock(ctx, zmq::socket_type::pub), refresh_ms(refresh) {}
