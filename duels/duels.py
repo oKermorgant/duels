@@ -2,32 +2,53 @@ import time
 import zmq
 import sys
 import yaml
+import threading
+import os
+import pygame
 
 class dict_to_obj(object):
   def __init__(self, adict):
     self.__dict__.update(adict)
-
+    
 class Subscriber:
     def __init__(self):
         # sys.argv begins with path to this file
-        self.ip = len(sys.argv) > 2 and sys.argv[2] or '127.0.0.1'
-        self.port = len(sys.argv) > 3 and int(sys.argv[3]) or 3003
+        self.ip = sys.argv[2]
+        self.port = int(sys.argv[3])
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.setsockopt_string( zmq.SUBSCRIBE, "" )
         self.socket.connect('tcp://{}:{}'.format(self.ip, self.port + 2 - self.port % 5))
         self.poller = zmq.Poller()
         self.poller.register(self.socket, zmq.POLLIN)
-
+        
+        # force pygame to quit if client has disappeared
+        self.winner = 0
+        threading.Thread(target=self.check_client, args=(int(sys.argv[4]),)).start()        
+        
+    def check_client(self, client_pid):
+        while True:
+            if self.winner:
+                break            
+            try:
+                os.kill(client_pid, 0)
+            except OSError:
+                try:
+                    pygame.quit()
+                except:
+                    pass
+                sys.exit(0)
+            
+            time.sleep(0.1)        
         
     def get_init(self, debug=False):        
         self.shake = self.context.socket(zmq.REP)
         self.shake.connect('tcp://{}:{}'.format(self.ip, self.port))
         #  Wait for next request from client
-        msg = self.shake.recv()
+        msg = yaml.safe_load(self.shake.recv())
         if debug:
-            print(yaml.safe_load(msg))
-        return dict_to_obj(yaml.safe_load(msg))
+            print(msg)
+        return dict_to_obj(msg)
     
     def ready(self):
         self.shake.send(b'ok')
@@ -37,8 +58,9 @@ class Subscriber:
     def refresh(self, debug=False):
         if not len(self.poller.poll(2000)):
             return dict_to_obj({'winner': -1})
-        msg = self.socket.recv()
+        msg = yaml.safe_load(self.socket.recv())
+        self.winner = msg['winner']        
         if debug:
-            print(yaml.safe_load(msg))
-        return dict_to_obj(yaml.safe_load(msg))
+            print(msg)
+        return dict_to_obj(msg)
     

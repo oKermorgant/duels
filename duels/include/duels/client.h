@@ -4,6 +4,8 @@
 #include <iostream>
 #include <duels/zmq.hpp>
 #include <duels/game_state.h>
+#include <unistd.h>
+#include <iostream>
 
 namespace duels
 {
@@ -55,23 +57,32 @@ public:
             }
         }
 
+        int pid(getpid());
+
         if(local_game)
         {
             ip = "127.0.0.1";
-            port = 3000;
+            port = 3000 + 5*(rand() % 100);
+
+            (void)system(("killall " + game + "_server -q").c_str());
 
             // launch local game
             std::stringstream ss;
             ss << DUELS_ROOT << "/bin/" << game << "_server";
+            ss << " -p " << port;
             ss << " -n1 '" << name << "'";
             ss << " -d " << difficulty << " &";
-            system(ss.str().c_str());
+            (void)system(ss.str().c_str());
         }
 
         // open display for this game
         std::stringstream ss;
-        ss << DUELS_ROOT << "/bin/" << game << "_gui.py" << " " << DUELS_ROOT << " " << ip << " " << port+3 << " &";
-        system(ss.str().c_str());
+        ss << DUELS_ROOT << "/bin/" << game << "_gui.py"
+                << " " << DUELS_ROOT
+                << " " << ip
+                << " " << port+3
+                << " " << pid << " &";
+        (void)system(ss.str().c_str());
 
         // connect to server as REP
         ss.str("");
