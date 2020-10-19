@@ -62,8 +62,8 @@ public:
         if(local_game)
         {
             ip = "127.0.0.1";
+            srand(time(nullptr));
             port = 3000 + 5*(rand() % 100);
-
             (void)system(("killall " + game + "_server -q").c_str());
 
             // launch local game
