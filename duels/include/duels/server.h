@@ -159,9 +159,9 @@ public:
         ctx.close();
     }
 
-    std::tuple<std::string, std::string, int> parseArgs(int argc, char** argv)
+    int parseArgs(int argc, char** argv)
     {
-        std::string name1("Player"), name2;
+        name1 = "Player";
         int port(3000);
 
         for(int arg = 0; arg < argc; arg++)
@@ -178,12 +178,14 @@ public:
             }
             else if(key == "-p")
                 port = atoi(argv[++arg]);
+            else if(key == "--nodisplay")
+                use_display = false;
         }
 
         if(difficulty)
             name2 = "Bot [" + std::to_string(difficulty) + "]";
 
-        return {name1, name2, port - (port % 5)};
+        return port - (port % 5);
     }
 
     Server() : sock(ctx, zmq::socket_type::pub), refresh_ms(refresh) {}
@@ -191,13 +193,13 @@ public:
     void initDisplay(int argc, char** argv, const initMsg &init_msg)
     {
         // register player names and base port
-        // -n1 name1 [-n2 name2] [-p port] [-d difficulty]
+        // -n1 name1 [-n2 name2] [-p port] [-d difficulty] [--nodisplay]
         // +0 -> p1 in
         // +1 -> p2 in
         // +2 -> displays out
         // +3 -> shake display 1 in
         // +4 -> shake display 2 in
-        auto [name1, name2, port] = parseArgs(argc, argv); {}
+        auto port = parseArgs(argc, argv); {}
 
         // wait for clients
         p1 = std::make_unique<Listener>(ctx, tcp_transport(port), hasTwoPlayers());
@@ -205,7 +207,9 @@ public:
             p2 = std::make_unique<Listener>(ctx, tcp_transport(port+1), true);
 
         // send initial display info as rep-req
-        const std::string req(init_msg.toYAMLString(name1, name2));
+        const std::string req(init_msg.toYAMLString(
+                                  use_display ? name1 :"nodisplay",
+                                  use_display ? name2 : "nodisplay"));
 
         sock.bind(tcp_transport(port+2));
         for(int i = 0; i < (hasTwoPlayers()?2:1); ++i)
@@ -216,7 +220,8 @@ public:
             shake.send(zmsg, zmq::send_flags::none);
             shake.recv(zmsg);
             shake.close();
-            wait(100);
+            if(use_display)
+                wait(100);
         }
     }
 
@@ -300,9 +305,17 @@ public:
         }
 
         if(msg1.state == State::WIN_FAIR || msg1.state == State::WIN_TIMEOUT || msg1.state == State::WIN_DISCONNECT)
+        {
+            if(!use_display)
+                std::cout << name1 << " " << winMsg(msg1.state) << std::endl;
             sendDisplay(display, 1);
+        }
         else
+        {
+            if(!use_display)
+                std::cout << name2 << " " << winMsg(msg1.state) << std::endl;
             sendDisplay(display, 2);
+        }
 
         p1->sendResult(msg1);
         if(hasTwoPlayers())
@@ -316,6 +329,8 @@ public:
 
     void sendDisplay(const displayMsg &display, int winner = 0)
     {
+        if(!use_display)
+            return;
         std::this_thread::sleep_until(refresh_last + refresh_ms);
         refresh_last = std::chrono::steady_clock::now();
         const std::string msg(display.toYAMLString(winner));
@@ -329,6 +344,8 @@ private:
     zmq::context_t ctx;
     zmq::socket_t sock;
     int difficulty = 1;
+    bool use_display = true;
+    std::string name1, name2;
 
     std::chrono::steady_clock::time_point refresh_last = std::chrono::steady_clock::now();
     const std::chrono::milliseconds refresh_ms;

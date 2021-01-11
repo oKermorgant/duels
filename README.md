@@ -17,7 +17,7 @@ For the framework, a duel game is defined by a yaml file (see examples) stating 
 To create a new game:
 - create a folder with the name of the game
 - create a yaml file with the same name, that contains the message information
-- call python <path_to_installed_duels>/gen_wrapper <game_name>
+- call python <path_to_installed_duels>/gen_wrapper.py <game_name>
 
 It will create the core server.cpp file where the game mechanics and display should be defined. 
 It also creates a `client_template` directory, to be used to create an actual game player

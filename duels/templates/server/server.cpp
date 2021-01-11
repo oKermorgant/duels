@@ -35,7 +35,7 @@ int main(int argc, char** argv)
   
 
 #ifdef LOCAL_GAME
-  game_io.initDisplay(init, "<game>");
+  game_io.initDisplay(init, "<game>");  // add false at the end if you run the display in another terminal
   game_io.setLevel(1);
 #else
   game_io.initDisplay(argc, argv, init);
@@ -82,21 +82,32 @@ int main(int argc, char** argv)
 
 #else
       // write dumb player AI from feedback1 to input1
+      
+      
+      
+      
 
 
 #endif
 
-
-
-
-
       // artificial opponent: put your AI here
+      
+      
+      
+      
+      
+      
+      
 
 #ifndef LOCAL_GAME
     }
 #endif
 
     // update game state from input1 and input2
+    
+    
+    
+    
   }
 
   // final results

@@ -13,8 +13,8 @@ class dict_to_obj(object):
 class Subscriber:
     def __init__(self):
         # sys.argv begins with path to this file
-        self.ip = sys.argv[2]
-        self.port = int(sys.argv[3])
+        self.ip = len(sys.argv) > 2 and sys.argv[2] or '127.0.0.1'
+        self.port = len(sys.argv) > 3 and int(sys.argv[3]) or 3003
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.setsockopt_string( zmq.SUBSCRIBE, "" )
@@ -24,7 +24,8 @@ class Subscriber:
         
         # force pygame to quit if client has disappeared
         self.winner = 0
-        threading.Thread(target=self.check_client, args=(int(sys.argv[4]),)).start()        
+        if len(sys.argv) > 4:
+            threading.Thread(target=self.check_client, args=(int(sys.argv[4]),)).start()        
         
     def check_client(self, client_pid):
         while True:

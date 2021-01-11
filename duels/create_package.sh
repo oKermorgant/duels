@@ -4,6 +4,7 @@ DST="$DST/../debian/"
 
 SRC=`cat "$DST/.path"`
 echo "Creating package from $SRC"
+echo "Make sure that all games are not #LOCAL_GAME"
 
 mkdir -p "$DST/duels/DEBIAN"
 mkdir -p "$DST/duels/$SRC"

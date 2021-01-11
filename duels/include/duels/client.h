@@ -5,7 +5,6 @@
 #include <duels/zmq.hpp>
 #include <duels/game_state.h>
 #include <unistd.h>
-#include <iostream>
 
 namespace duels
 {
