@@ -6,8 +6,6 @@
 #else
 #include <duels/server.h>
 #endif
-#include <duels/<game>/mechanics.h>
-#include <duels/utils/rand_utils.h>
 
 using duels::Player;
 using namespace duels::<game>;
@@ -22,6 +20,7 @@ int main(int argc, char** argv)
 {
   feedbackMsg feedback1, feedback2;
   inputMsg input;
+  initMsg init;
   displayMsg display;
   GameIO game_io;
   // simulation time
@@ -88,7 +87,7 @@ int main(int argc, char** argv)
 
 
     // check if any regular winner after this turn
-    if(game.hit_type)
+    if(false)
     {
       //if(...)
       game_io.registerVictory(Player::One, feedback1, feedback2);

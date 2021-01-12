@@ -21,20 +21,22 @@ private:
 public:
     const int timeout;
 
-    Client(int _timeout, std::string name, int difficulty, std::string ip, std::string game)
+    Client(int _timeout, std::string name, int difficulty, std::string ip, std::string game, std::string server_args)
         : timeout(_timeout), sock(ctx, zmq::socket_type::rep)
     {
         int port(3000);
 
         // request game server at IP
         bool local_game = true;
-        if(ip != "127.0.0.1")
+        if(ip != "local_game")
         {
             zmq::socket_t manager(ctx, zmq::socket_type::req);
             manager.connect("tcp://" + ip + ":2999");
 
             // send game and name
-            std::string req(game + " " + name);
+            if(server_args == "")
+                server_args = "_";
+            std::string req(game + " " + name + " " + server_args);
             zmq::message_t zreq(req.data(), req.length());
             manager.send(zreq, zmq::send_flags::none);
 
@@ -50,9 +52,9 @@ public:
                 if(port)
                     local_game = false;
                 if(port % 5 == 0)
-                    std::cout << "Waiting for another player..." << std::endl;
+                    std::cout << "Waiting for another player on port " << port << "..." << std::endl;
                 else
-                    std::cout << "Joining a waiting player..." << std::endl;
+                    std::cout << "Joining a waiting player on port " << port << "..." << std::endl;
             }
         }
 
@@ -70,21 +72,25 @@ public:
             ss << DUELS_ROOT << "/bin/" << game << "_server";
             ss << " -p " << port;
             ss << " -n1 '" << name << "'";
-            ss << " -d " << difficulty << " &";
+            ss << " -d " << difficulty;
+            ss << " " << server_args << " &";
             (void)system(ss.str().c_str());
         }
 
         // open display for this game
-        std::stringstream ss;
-        ss << DUELS_ROOT << "/bin/" << game << "_gui.py"
-                << " " << DUELS_ROOT
-                << " " << ip
-                << " " << port+3
-                << " " << pid << " &";
-        (void)system(ss.str().c_str());
+        if(server_args.find("nodisplay") == server_args.npos)
+        {
+            std::stringstream ss;
+            ss << DUELS_ROOT << "/bin/" << game << "_gui.py"
+               << " " << DUELS_ROOT
+               << " " << ip
+               << " " << port+3
+               << " " << pid << " &";
+            (void)system(ss.str().c_str());
+        }
 
         // connect to server as REP
-        ss.str("");
+        std::stringstream ss;
         ss << "tcp://" << ip << ":" << port;
         sock.connect(ss.str());
     }
@@ -96,6 +102,31 @@ public:
         msg = *(static_cast<feedbackMsg*>(zmsg.data()));
 
         return msg.state == State::ONGOING;
+        /*if(msg.state != State::ONGOING)
+        {
+            switch (msg.state)
+            {
+            case State::WIN_FAIR:
+                std::cout << "You win! Fair victory" << std::endl;
+                break;
+            case State::WIN_TIMEOUT:
+                std::cout << "You win! Opponent has timed out" << std::endl;
+                break;
+            case State::WIN_DISCONNECT:
+                std::cout << "You win! Opponent has crashed" << std::endl;
+                break;
+            case State::LOSE_FAIR:
+                std::cout << "You lose! Fair game" << std::endl;
+                break;
+            case State::LOSE_TIMEOUT:
+                std::cout << "You lose! Timed out..." << std::endl;
+                break;
+            default:
+                break;
+            }
+            return false;
+        }
+        return true;*/
     }
 
     void send(const inputMsg &msg)
@@ -105,7 +136,6 @@ public:
     }
 
 };
-
 
 }
 

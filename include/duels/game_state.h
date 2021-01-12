@@ -5,11 +5,12 @@
 
 namespace duels
 {
-enum class State
+    
+enum State
 {
-    ONGOING,
-    WIN_FAIR, WIN_TIMEOUT, WIN_DISCONNECT,
-    LOSE_FAIR, LOSE_TIMEOUT
+    ONGOING=0,
+    WIN_FAIR=1, WIN_TIMEOUT=2, WIN_DISCONNECT=3,
+    LOSE_FAIR=4, LOSE_TIMEOUT=5,OTHER=6
 };
 
 inline std::string winMsg(State state)

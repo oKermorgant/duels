@@ -3,7 +3,7 @@ import sys
 sys.path.insert(1, sys.argv[1])
 from duels import Subscriber
 game = Subscriber()
-init_msg = game.get_init()  # may exit if headless mode
+init_msg = game.get_init() 
 
 # add other imports here /(e.g. pygame) 
 

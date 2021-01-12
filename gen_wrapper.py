@@ -84,13 +84,15 @@ class Game: public duels::Client<inputMsg, feedbackMsg>
 {{
 public:
   Game(std::string name, int difficulty = 1)
-    : Game(name, difficulty, "127.0.0.1") {{}}
+    : Game(name, difficulty, "local_game", "") {{}}
   Game(std::string name, std::string ip, int difficulty = 1)
-      : Game(name, difficulty, ip) {{}}
+      : Game(name, difficulty, ip, "") {{}}
+  Game(std::string name, std::string ip, std::string server_args)
+      : Game(name, 0, ip, server_args) {{}}
 private:
-  Game(std::string name, int difficulty, std::string ip)
+  Game(std::string name, int difficulty, std::string ip, std::string server_args)
       : duels::Client<inputMsg, feedbackMsg>(
-      {timeout}, name, difficulty, ip, "{game}") {{}}
+      {timeout}, name, difficulty, ip, "{game}", server_args) {{}}
 }};
 }}
 }}

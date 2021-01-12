@@ -207,21 +207,20 @@ public:
             p2 = std::make_unique<Listener>(ctx, tcp_transport(port+1), true);
 
         // send initial display info as rep-req
-        const std::string req(init_msg.toYAMLString(
-                                  use_display ? name1 :"nodisplay",
-                                  use_display ? name2 : "nodisplay"));
-
-        sock.bind(tcp_transport(port+2));
-        for(int i = 0; i < (hasTwoPlayers()?2:1); ++i)
+        if(use_display)
         {
-            zmq::socket_t shake(ctx, zmq::socket_type::req);
-            shake.bind(tcp_transport(port+3+i));
-            zmq::message_t zmsg(req.data(), req.length());
-            shake.send(zmsg, zmq::send_flags::none);
-            shake.recv(zmsg);
-            shake.close();
-            if(use_display)
-                wait(100);
+            const std::string req(init_msg.toYAMLString(name1,name2));
+            sock.bind(tcp_transport(port+2));
+            for(int i = 0; i < (hasTwoPlayers()?2:1); ++i)
+            {
+                zmq::socket_t shake(ctx, zmq::socket_type::req);
+                shake.bind(tcp_transport(port+3+i));
+                zmq::message_t zmsg(req.data(), req.length());
+                shake.send(zmsg, zmq::send_flags::none);
+                shake.recv(zmsg);
+                shake.close();
+            }
+            wait(100);
         }
     }
 
@@ -242,6 +241,9 @@ public:
 
     bool sync(const Player &player, const feedbackMsg &msg, inputMsg &player_input)
     {
+        //std::cout << "sync with " << ((player == Player::One)?"p1":"p2") << std::endl;
+        
+        
         const auto &p = (player == Player::One)?p1:p2;
         p->send(msg);
         const auto state = p->waitForInput(player_input);
@@ -291,7 +293,9 @@ public:
             msg2.state = State::WIN_TIMEOUT;
         }
         else if(p1->status == Client::DISCONNECT)
+        {
             msg2.state = State::WIN_DISCONNECT;
+        }
 
         if(hasTwoPlayers())
         {
@@ -306,14 +310,14 @@ public:
 
         if(msg1.state == State::WIN_FAIR || msg1.state == State::WIN_TIMEOUT || msg1.state == State::WIN_DISCONNECT)
         {
-            if(!use_display)
-                std::cout << name1 << " " << winMsg(msg1.state) << std::endl;
+            if(hasTwoPlayers())
+                std::cout << "winner: p1 / " << winMsg(msg1.state) << std::endl;
             sendDisplay(display, 1);
         }
         else
         {
-            if(!use_display)
-                std::cout << name2 << " " << winMsg(msg1.state) << std::endl;
+            if(hasTwoPlayers())
+                std::cout << "winner: p2 / " << winMsg(msg2.state) << std::endl;
             sendDisplay(display, 2);
         }
 

@@ -15,10 +15,13 @@ class Subscriber:
         # sys.argv begins with path to this file
         self.ip = len(sys.argv) > 2 and sys.argv[2] or '127.0.0.1'
         self.port = len(sys.argv) > 3 and int(sys.argv[3]) or 3003
+        print('display shake on port {}'.format(self.port))
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.setsockopt_string( zmq.SUBSCRIBE, "" )
         self.socket.connect('tcp://{}:{}'.format(self.ip, self.port + 2 - self.port % 5))
+        print('display in on port {}'.format(self.port + 2 - self.port % 5))
+
         self.poller = zmq.Poller()
         self.poller.register(self.socket, zmq.POLLIN)
         

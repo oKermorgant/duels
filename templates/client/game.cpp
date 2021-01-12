@@ -4,7 +4,7 @@ using namespace duels::<game>;
 
 int main()
 {
-  Game game;
+  Game game("your name");
 
   inputMsg input;
   feedbackMsg feedback;
