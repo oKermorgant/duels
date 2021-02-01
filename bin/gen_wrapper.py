@@ -106,13 +106,12 @@ def dict_replace(s, d):
     return s
 
 if __name__ == '__main__':
-    path = os.path.abspath(os.path.dirname(__file__)) + '/'
-    if not os.path.exists(path + 'bin'):
-        print('Run this script from an installation folder, not the source folder')
-        sys.exit(0)
-        
+    
     game_path = len(sys.argv) == 2 and sys.argv[1] or '.'
     game_path = os.path.abspath(game_path) + '/'
+    
+    # installation from this file path
+    duels_path = os.path.abspath(os.path.dirname(__file__) + '/..') + '/'
 
     description_file = ''
     for msg in os.listdir(game_path):
@@ -134,8 +133,8 @@ if __name__ == '__main__':
     if 'turn_based' not in description:
         description['turn_based'] = False
     description['game'] = game
-    description['duels_path'] = path[:-1]
-        
+    description['duels_path'] = duels_path[:-1]
+    
     # create directories
     for d in ('include', 'include/duels', 'include/duels/'+game, 'client_template'):
         if not os.path.exists(game_path + d):
@@ -156,7 +155,7 @@ if __name__ == '__main__':
         if os.path.exists(dst_path):
             print('Skipping {}, file exists'.format(dst_path))
         else:
-            with open(path + 'templates/server/' + src) as f:
+            with open(duels_path + 'templates/server/' + src) as f:
                 content = f.read()
             with open(dst_path, 'w') as f:
                 f.write(dict_replace(content, description))
@@ -167,7 +166,7 @@ if __name__ == '__main__':
         if os.path.exists(dst_path):
             print('Skipping {}, file exists'.format(dst_path))
         else:
-            with open(path + 'templates/client/' + src) as f:
+            with open(duels_path + 'templates/client/' + src) as f:
                 content = f.read()
             with open(dst_path, 'w') as f:
                 f.write(dict_replace(content, description))

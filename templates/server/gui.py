@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys
 sys.path.insert(1, sys.argv[1])
+print('Called with ' + sys.argv[1])
 from duels import Subscriber
 game = Subscriber()
 init_msg = game.get_init() 

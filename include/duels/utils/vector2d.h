@@ -33,6 +33,11 @@ public:
         return x == other.x && y == other.y;
     }
 
+    bool is(const Vector2D &other) const
+    {
+         return x == other.x && y == other.y;
+    }
+
     Numeric norm(bool use_manhattan = false) const
     {
         if(use_manhattan)

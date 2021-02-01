@@ -7,7 +7,7 @@ import threading
 
 
 # get known games
-base_path = os.path.dirname(__file__) + '/bin'
+base_path = os.path.dirname(__file__)
 
 class Game:
     def __init__(self, game, name1, port, server_args):

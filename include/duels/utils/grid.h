@@ -50,6 +50,11 @@ public:
     return v.x >= 0 && v.y >= 0 && v.x < cols && v.y < rows;
   }
 
+  bool isFree(int x, int y) const
+  {
+    return inBounds(x, y) && cell(x,y) == 0;
+  }
+
   int height() {return rows;}
   int width() {return cols;}
 

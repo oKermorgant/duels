@@ -65,7 +65,7 @@ public:
         {
             // run display exec
             std::stringstream ss;
-            ss << "python3 " << DUELS_ROOT << "/bin/" << game << "_gui.py" << " " << DUELS_ROOT
+            ss << "python3 " << GAME_SOURCE_DIR << "/" << game << "_gui.py" << " " << DUELS_BIN_PATH
                << " 127.0.0.1 "
                << port+3 << " "
                << getpid() << " &";

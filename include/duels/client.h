@@ -46,7 +46,7 @@ public:
             zmq::message_t zrep;
             if(item.revents & ZMQ_POLLIN)
             {
-                manager.recv(zrep);
+                (void) manager.recv(zrep);
                 std::stringstream ss(std::string(static_cast<char*>(zrep.data()), zrep.size()));
                 ss >> port;
                 if(port)
@@ -60,6 +60,15 @@ public:
 
         int pid(getpid());
 
+        // paths may change depending on local testing
+#ifdef GAME_SOURCE_DIR
+        const std::string server_dir(std::string(GAME_SOURCE_DIR) + "/build");
+        const std::string gui_dir= (GAME_SOURCE_DIR);
+#else
+        const std::string server_dir(DUELS_BIN_PATH);
+        const std::string gui_dir(DUELS_BIN_PATH);
+#endif
+
         if(local_game)
         {
             ip = "127.0.0.1";
@@ -69,7 +78,7 @@ public:
 
             // launch local game
             std::stringstream ss;
-            ss << DUELS_ROOT << "/bin/" << game << "_server";
+            ss << server_dir << "/" << game << "_server";
             ss << " -p " << port;
             ss << " -n1 '" << name << "'";
             ss << " -d " << difficulty;
@@ -81,8 +90,8 @@ public:
         if(server_args.find("nodisplay") == server_args.npos)
         {
             std::stringstream ss;
-            ss << DUELS_ROOT << "/bin/" << game << "_gui.py"
-               << " " << DUELS_ROOT
+            ss << "python3 " << gui_dir << "/" << game << "_gui.py"
+               << " " << DUELS_BIN_PATH
                << " " << ip
                << " " << port+3
                << " " << pid << " &";
@@ -98,7 +107,8 @@ public:
     bool get(feedbackMsg &msg)
     {
         zmq::message_t zmsg;
-        sock.recv(zmsg);
+
+        (void) sock.recv(zmsg);
         msg = *(static_cast<feedbackMsg*>(zmsg.data()));
 
         return msg.state == State::ONGOING;

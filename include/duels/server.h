@@ -27,6 +27,11 @@ std::string tcp_transport(int port = 0)
 }
 }
 
+void print(std::string s)
+{
+ std::cout << "[server] " << s << std::endl;   
+}
+
 enum class Player {One, Two};
 
 template <class initMsg, class inputMsg, class feedbackMsg, class displayMsg, int timeout, int refresh>
@@ -113,6 +118,7 @@ class Server
             {
                 sock.recv(zmsg);
                 const auto end = std::chrono::steady_clock::now();
+                print("recv msg: time = " + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()));
                 if(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
                         > timeout)
                     status = Client::TIMEOUT;
@@ -220,8 +226,8 @@ public:
                 shake.recv(zmsg);
                 shake.close();
             }
-            wait(100);
-        }
+        } 
+        wait(100);
     }
 
     double samplingTime() const
@@ -241,9 +247,6 @@ public:
 
     bool sync(const Player &player, const feedbackMsg &msg, inputMsg &player_input)
     {
-        //std::cout << "sync with " << ((player == Player::One)?"p1":"p2") << std::endl;
-        
-        
         const auto &p = (player == Player::One)?p1:p2;
         p->send(msg);
         const auto state = p->waitForInput(player_input);
@@ -310,14 +313,10 @@ public:
 
         if(msg1.state == State::WIN_FAIR || msg1.state == State::WIN_TIMEOUT || msg1.state == State::WIN_DISCONNECT)
         {
-            if(hasTwoPlayers())
-                std::cout << "winner: p1 / " << winMsg(msg1.state) << std::endl;
             sendDisplay(display, 1);
         }
         else
         {
-            if(hasTwoPlayers())
-                std::cout << "winner: p2 / " << winMsg(msg2.state) << std::endl;
             sendDisplay(display, 2);
         }
 
@@ -333,10 +332,11 @@ public:
 
     void sendDisplay(const displayMsg &display, int winner = 0)
     {
-        if(!use_display)
-            return;
         std::this_thread::sleep_until(refresh_last + refresh_ms);
         refresh_last = std::chrono::steady_clock::now();
+        if(!use_display)
+            return;
+
         const std::string msg(display.toYAMLString(winner));
         zmq::message_t zmsg(msg.data(), msg.length());
         sock.send(zmsg, zmq::send_flags::none);
