@@ -2,119 +2,118 @@
 #define DUELS_A_STAR_H
 
 #include <vector>
+#include <queue>
+#include <map>
 #include <algorithm>
 #include <iostream>
 #include <fstream>
-#include <queue>
 #include <chrono>
 #include <memory>
 
 namespace duels
 {
 
-// keep track of who comes from who
-// use a sorted vector based on node pointers
-template <class T>
-class PtrMap : std::vector<std::pair<std::unique_ptr<T>, T*>>
+namespace
 {
+// compare pointer and object
+template <class Node>
+inline bool areSame(const Node * l1, const Node & l2)
+{
+    return *l1 == l2;
+}
+
+// resulting tree + owner of objects
+template <class Node>
+class Tree : public std::map<Node*, Node*>
+{
+    std::queue<std::unique_ptr<Node>> nodes;
+    std::vector<Node*> closedSet;
 public:
-    void update(T* node, T* parent)
+    inline void insert(std::unique_ptr<Node> & node, Node* parent)
     {
-        for(auto &[cur_node,cur_parent]: *this)
-        {
-            if(cur_node.get() == node)
-            {
-                cur_parent = parent;
-                return;
-            }
-        }
+        std::map<Node*, Node*>::emplace(node.get(), parent);
+        nodes.emplace(std::move(node));
     }
-
-    T* getParent(T* key)
+    inline void close(Node * node)
     {
-        for(auto &v: *this)
-        {
-            if(v.first.get() == key)
-            {
-                return v.second;
-            }
-        }
-        return 0;
+        closedSet.push_back(node);
     }
-
-    // insertion
-    void add(std::unique_ptr<T> &key, T* val)
+    inline bool isVisited(Node * node_ptr) const
     {
-        this->push_back({std::move(key), val});
+        const auto &node(*node_ptr);
+        return std::find_if(closedSet.rbegin(), closedSet.rend(),[&node](Node* elem)
+        {return areSame(elem, node);}) != closedSet.rend();
+    }
+    std::vector<Node> fullPathTo(Node* best) const
+    {
+        std::vector<Node> path;
+        const auto start(closedSet[0]);
+        // build list from end to start
+        while(best != start)
+        {
+            path.push_back(*best);
+            best = this->at(best);
+        }
+        path.push_back(*start);
+        // list from start to end
+        std::reverse(path.begin(),path.end());
+        return path;
     }
 };
 
-
-// reconstruct path from last best element
-template<class T>
-std::vector<T> reconstructPath(PtrMap<T> &come_from, T* best)
+// Generic node with distance to start (g) + total cost from heuristic (f = g+h)
+template <class Node, typename Heuristic>
+struct NodeWithCost
 {
-    std::vector<T> path = {*best};
-    // build list from end to start
-    while(come_from.getParent(best))
+    Node* node;
+    Heuristic f;
+    Heuristic g;
+    inline NodeWithCost(Node* _node=nullptr, Heuristic _h=0, Heuristic _g=0)
+        : node(_node), f(_h+_g), g(_g) {}
+    bool operator<(const NodeWithCost & other) const
     {
-        best = come_from.getParent(best);
-        path.push_back(*best);
+        // if(f == other.f)
+        //   return g < other.g;
+        return f >= other.f;
     }
-    // list from start to end
-    std::reverse(path.begin(),path.end());
-    return path;
+};
+
+// Priory queue with find
+template <class Node,typename Heuristic>
+class Queue :
+        public std::priority_queue<NodeWithCost<Node,Heuristic>, std::vector<NodeWithCost<Node,Heuristic>>>
+{
+public:
+    std::pair<NodeWithCost<Node,Heuristic>,bool> find(const Node& node)
+    {
+        for(auto &it : this->c)
+        {
+            if(areSame(it.node, node))
+                return {it,true};
+        }
+        return {{},false};
+    }
+};
 }
 
 // templated version of A* algorithm
-template<class T>
-std::vector<T> Astar(T start, T goal, bool shuffle = false)
+template<class Node,typename Heuristic=float>
+std::vector<Node> Astar(Node start, Node goal, bool shuffle = false)
 {
-    struct NodeWithCost
-    {
-        T* node;
-        float f;
-        float g;
-        NodeWithCost(T* _node, float _h, float _g = 0)
-            : node(_node), f(_h+_g), g(_g) {}
-        bool operator<(const NodeWithCost & other) const
-        {
-            if(f == other.f)
-                return g > other.g;
-            return f > other.f;
-        }
-    };
-
-    class priority_access :
-            public std::priority_queue<NodeWithCost, std::vector<NodeWithCost>>
-    {
-    public:
-        NodeWithCost* find( const T& node)
-        {
-            for(auto &it : this->c)
-            {
-                if(it.node->is(node))
-                    return &it;
-            }
-            return 0;
-        }
-    };
-
-    std::vector<T*> closedSet;
-    priority_access queue;
+    Queue<Node,Heuristic> queue;
     queue.push({&start, start.h(goal)});
 
     // keep track of who comes from who
-    PtrMap<T> come_from;
+    Tree<Node> tree;
 
     while(!queue.empty())
     {
         auto best = queue.top();
 
-        if(best.node->is(goal))
-            return reconstructPath(come_from, best.node);
+        if(areSame(best.node, goal))
+            return tree.fullPathTo(best.node);
 
-        closedSet.push_back(best.node);
+        tree.close(best.node);
         queue.pop();
 
         auto children = best.node->children();
@@ -127,22 +126,20 @@ std::vector<T> Astar(T start, T goal, bool shuffle = false)
         {
             auto child_ptr = child.get();
             // ensure we have not been here
-            if(std::find_if(closedSet.rbegin(), closedSet.rend(),
-                            [&child_ptr](T* elem){return elem->is(*child_ptr);}) == closedSet.rend())
+            if(!tree.isVisited(child_ptr))
             {
-                auto twin = queue.find(*child_ptr);
                 const auto child_g = best.g + child_ptr->distToParent();
-                if(!twin)
+                if(const auto &[twin,valid] = queue.find(*child_ptr);!valid)
                 {
                     queue.push({child_ptr,
                                 child_ptr->h(goal),
                                 child_g});
-                    come_from.add(child, best.node);
+                    tree.insert(child, best.node);
                 }
-                else if(twin->g > child_g)
+                else if(twin.g > child_g)
                 {
-                    come_from.update(twin->node, best.node);
-                    queue.push({twin->node, twin->f - twin->g, child_g});
+                    tree[twin.node] = best.node;
+                    queue.push({twin.node, twin.f - twin.g, child_g});
                 }
             }
         }
