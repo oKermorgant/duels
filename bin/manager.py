@@ -104,7 +104,7 @@ while True:
         else:
             # find a new port for this game
             used = [g.port for g in games]
-            port = 3000
+            port = 3005
             while port in used:
                 port += 5
             games.append(Game(game, name, port, server_args))            

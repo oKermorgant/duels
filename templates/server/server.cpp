@@ -7,12 +7,14 @@
 #include <duels/server.h>
 #endif
 
-using duels::Player;
 using namespace duels::<game>;
+using duels::Player;
+using duels::Timeout;
+using duels::Refresh;
 #ifdef LOCAL_GAME
-using GameIO = duels::LocalGame<initMsg, inputMsg, feedbackMsg, displayMsg, <timeout>, <refresh>>;
+using GameIO = duels::LocalGame<initMsg, inputMsg, feedbackMsg, displayMsg>;
 #else
-using GameIO = duels::Server<initMsg, inputMsg, feedbackMsg, displayMsg, <timeout>, <refresh>>;
+using GameIO = duels::Server<initMsg, inputMsg, feedbackMsg, displayMsg>;
 #endif
 
 
@@ -22,7 +24,7 @@ int main(int argc, char** argv)
   initMsg init;
   inputMsg input1, input2;
   displayMsg display;
-  GameIO game_io;
+  GameIO game_io(Timeout(<timeout>), Refresh(<refresh>));
   // simulation time
   const double dt(game_io.samplingTime());
 

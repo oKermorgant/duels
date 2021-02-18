@@ -16,6 +16,7 @@ find_library ( ZMQ_LIBRARY NAMES zmq )
 include_directories(include ${DUELS_ROOT}/include ${ZMQ_INCLUDE_DIR})
 add_definitions(-DDUELS_BIN_PATH="${DUELS_ROOT}/bin")
 add_definitions(-DGAME_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_definitions(-DDUELS_SERVER)
 
 add_executable(<game>_server server.cpp)
 target_link_libraries(<game>_server ${CMAKE_THREAD_LIBS_INIT} ${ZMQ_LIBRARY})

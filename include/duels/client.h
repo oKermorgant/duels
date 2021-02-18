@@ -2,12 +2,23 @@
 #define DUELS_CLIENT_H
 
 #include <iostream>
-#include <duels/zmq.hpp>
+#include <duels/zmq_io.h>
 #include <duels/game_state.h>
+#include <duels/parser.h>
 #include <unistd.h>
 
 namespace duels
 {
+
+template <class T>
+void print(std::string s, T val={})
+{
+    std::cout << "[client] " << s << " = " << val << std::endl;
+}
+void print(std::string s)
+{
+    std::cout << "[client] " << s << std::endl;
+}
 
 template <class inputMsg, class feedbackMsg>
 class Client
@@ -17,102 +28,106 @@ private:
     feedbackMsg feedback;
     zmq::context_t ctx;
     zmq::socket_t sock;
+    Timeout server_timeout;
+    Timeout timeout;
 
+    Clock::time_point feedback_time;
+    bool looks_like_timeout = false;
 public:
-    const int timeout;
 
-    Client(int _timeout, std::string name, int difficulty, std::string ip, std::string game, std::string server_args)
-        : timeout(_timeout), sock(ctx, zmq::socket_type::rep)
+    int timeout_ms() const {return timeout.ms.count();}
+
+    Client(int argc, char** argv, int timeout_ms, int server_timeout_ms, std::string name, int difficulty, std::string ip, std::string game)
+        : server_timeout(server_timeout_ms), timeout(timeout_ms), sock(ctx, zmq::socket_type::rep)
     {
-        int port(3000);
+        ArgParser parser(argc, argv, ip);
 
         // request game server at IP
-        bool local_game = true;
-        if(ip != "local_game")
+        if(parser.isRemote())
         {
             zmq::socket_t manager(ctx, zmq::socket_type::req);
             manager.connect("tcp://" + ip + ":2999");
 
             // send game and name
-            if(server_args == "")
-                server_args = "_";
-            std::string req(game + " " + name + " " + server_args);
+            std::string req(game + " " + name);
             zmq::message_t zreq(req.data(), req.length());
             manager.send(zreq, zmq::send_flags::none);
 
             // get port back
             zmq::pollitem_t item = {static_cast<void*>(manager), 0, ZMQ_POLLIN, 0};
-            zmq::poll(&item, 1, _timeout);
+            zmq::poll(&item, 1, timeout.ms);
             zmq::message_t zrep;
             if(item.revents & ZMQ_POLLIN)
             {
                 (void) manager.recv(zrep);
-                std::stringstream ss(std::string(static_cast<char*>(zrep.data()), zrep.size()));
-                ss >> port;
-                if(port)
-                    local_game = false;
-                if(port % 5 == 0)
-                    std::cout << "Waiting for another player on port " << port << "..." << std::endl;
+                if(parser.updateFrom({static_cast<char*>(zrep.data()), zrep.size()}))
+                {
+                    if(parser.isPlayer1())
+                        std::cout << "Waiting for another player on port " << parser.port() << "..." << std::endl;
+                    else
+                        std::cout << "Joining a waiting player on port " << parser.port() << "..." << std::endl;
+                }
                 else
-                    std::cout << "Joining a waiting player on port " << port << "..." << std::endl;
+                    std::cout << "Game manager not reachable, running local game with difficulty " << difficulty << std::endl;
             }
         }
-
         int pid(getpid());
 
         // paths may change depending on local testing
 #ifdef GAME_SOURCE_DIR
         const std::string server_dir(std::string(GAME_SOURCE_DIR) + "/build");
-        const std::string gui_dir= (GAME_SOURCE_DIR);
+        const std::string gui_dir(GAME_SOURCE_DIR);
 #else
         const std::string server_dir(DUELS_BIN_PATH);
         const std::string gui_dir(DUELS_BIN_PATH);
 #endif
 
-        if(local_game)
+        if(parser.localServer())
         {
-            ip = "127.0.0.1";
-            srand(time(nullptr));
-            port = 3000 + 5*(rand() % 100);
             (void)system(("killall " + game + "_server -q").c_str());
 
             // launch local game
             std::stringstream ss;
             ss << server_dir << "/" << game << "_server";
-            ss << " -p " << port;
+            ss << " -p " << parser.port();
             ss << " -n1 '" << name << "'";
-            ss << " -d " << difficulty;
-            ss << " " << server_args << " &";
+            ss << " -d " << difficulty << " &";
             (void)system(ss.str().c_str());
         }
 
         // open display for this game
-        if(server_args.find("nodisplay") == server_args.npos)
+        if(parser.displayPort())
         {
             std::stringstream ss;
             ss << "python3 " << gui_dir << "/" << game << "_gui.py"
                << " " << DUELS_BIN_PATH
-               << " " << ip
-               << " " << port+3
+               << " " << parser.serverIP()
+               << " " << parser.displayPort()
                << " " << pid << " &";
             (void)system(ss.str().c_str());
         }
 
         // connect to server as REP
-        std::stringstream ss;
-        ss << "tcp://" << ip << ":" << port;
-        sock.connect(ss.str());
+        sock.setsockopt( ZMQ_LINGER, 0 );
+        sock.connect(parser.serverURL());
     }
 
     bool get(feedbackMsg &msg)
     {
-        zmq::message_t zmsg;
+        static bool first_contact(true);
 
-        (void) sock.recv(zmsg);
-        msg = *(static_cast<feedbackMsg*>(zmsg.data()));
+        if(first_contact)
+        {
+            // no timeout
+            zmq::message_t zmsg;
+            (void)sock.recv(zmsg);
+            msg = *(static_cast<feedbackMsg*>(zmsg.data()));
+            first_contact = false;
+        }
+        else if(read_timeout(sock, msg, server_timeout) == Bond::DISCONNECT)
+            msg.state = State::SERVER_DISCONNECT;
 
-        return msg.state == State::ONGOING;
-        /*if(msg.state != State::ONGOING)
+        if(msg.state != State::ONGOING)
         {
             switch (msg.state)
             {
@@ -130,17 +145,24 @@ public:
                 break;
             case State::LOSE_TIMEOUT:
                 std::cout << "You lose! Timed out..." << std::endl;
-                break;
+                break;                
             default:
+                std::cout << "Game has stopped - very long timeout from you or your opponent";
+                if(looks_like_timeout)
+                    std::cout << " (it looks like it could be you)";
+                std::cout << std::endl;
                 break;
             }
             return false;
         }
-        return true;*/
+        feedback_time = Clock::now();
+        return true;
     }
 
     void send(const inputMsg &msg)
     {
+        if(timeout.tooLongSince(feedback_time))
+            looks_like_timeout = true;
         zmq::message_t zmsg(&msg, sizeof(msg));
         sock.send(zmsg, zmq::send_flags::none);
     }

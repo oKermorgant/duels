@@ -10,15 +10,15 @@ class dict_to_obj(object):
     self.__dict__.update(adict)
     
 class Subscriber:
-    def __init__(self):
+    def __init__(self, server_timeout = 2000):
         # sys.argv begins with path to this file
         self.ip = len(sys.argv) > 2 and sys.argv[2] or '127.0.0.1'
         self.port = len(sys.argv) > 3 and int(sys.argv[3]) or 3003
-        #print('display shake on port {}'.format(self.port))
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.setsockopt_string( zmq.SUBSCRIBE, "" )
-        self.socket.connect('tcp://{}:{}'.format(self.ip, self.port + 2 - self.port % 5))
+        self.socket.connect('tcp://{}:{}'.format(self.ip, self.port - (self.port % 5) + 2))
+        self.server_timeout = server_timeout
         #print('display in on port {}'.format(self.port + 2 - self.port % 5))
 
         self.poller = zmq.Poller()
@@ -26,6 +26,7 @@ class Subscriber:
         
         # force pygame to quit if client has disappeared
         self.winner = 0
+        self.reason = 'fair victory'
         if len(sys.argv) > 4:
             threading.Thread(target=self.check_client, args=(int(sys.argv[4]),)).start()        
         
@@ -59,10 +60,15 @@ class Subscriber:
         time.sleep(.1)
         
     def refresh(self, debug=False):
-        if not len(self.poller.poll(2000)):
-            return dict_to_obj({'winner': -1})
+        if not len(self.poller.poll(self.server_timeout)):
+            self.winner = -1
+            return None
         msg = yaml.safe_load(self.socket.recv())
-        self.winner = msg['winner']        
+        if msg['winner']:
+            self.winner = abs(msg['winner'])
+            if msg['winner'] < 0:
+                self.reason = 'timeout'
+        msg.pop('winner')
         if debug:
             print(msg)
         return dict_to_obj(msg)

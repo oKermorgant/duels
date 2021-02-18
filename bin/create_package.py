@@ -9,8 +9,13 @@ pjoin = os.path.join
 version = '1.1'
 duels_path = os.path.abspath(os.path.dirname(__file__) + '/..')
 dest = '/opt/duels'
-if len(sys.argv) == 2:
-    dest = sys.argv[1]
+install = False
+
+for i,arg in enumerate(sys.argv):
+    if arg == '-d':
+        dest = sys.argv[i+1]
+    elif arg == '-i':
+        install = True
     
 def latest_mtime(d, ignores = []):
     mtime = 0
@@ -25,10 +30,11 @@ def latest_mtime(d, ignores = []):
                 i += 1
         if len(files):
             for f in files:
-                f_mtime = os.stat(pjoin(directory,f)).st_mtime
-                if f_mtime > mtime:
-                    mtime = f_mtime
-                    latest_file = f
+                if f not in ['CMakeLists.txt.user']:
+                    f_mtime = os.stat(pjoin(directory,f)).st_mtime
+                    if f_mtime > mtime:
+                        mtime = f_mtime
+                        latest_file = f
     return mtime,latest_file
 
 class Game:
@@ -43,7 +49,7 @@ class Game:
     msg[OK] = 'ready to ship'
     msg[NOT_INSTALLED] = 'not installed'
     msg[LOCAL_FLAG] = 'source has #define LOCAL_GAME'
-    msg[NEED_RECOMPILE] = 'source more recent than duels library'
+    msg[NEED_RECOMPILE] = 'installed version less recent than duels library'
     msg[NOT_SURE] = 'not checked'
 
     def __init__(self,directory):
@@ -52,6 +58,11 @@ class Game:
         self.binary = self.name + '_server'
         self.server = pjoin(directory, 'server.cpp')
         self.status = self.NOT_SURE
+    
+    @staticmethod
+    def register_duels_mtime(games):
+        Game.duels_mtime,filename = latest_mtime(pjoin(duels_path, 'include'), [game.name for game in games])
+        Game.msg[Game.NEED_RECOMPILE] += ' (' + filename + ')'
         
     def valid_source(self):
         return os.path.exists(pjoin(self.src, self.name + '.yaml')) and os.path.exists(self.server)
@@ -92,20 +103,37 @@ class Game:
                 
     def check_mtime(self):
         
-        # binary should be more recent than source
-        if latest_mtime(self.src)[0] > latest_mtime(pjoin(self.src,'build'))[0]:
-            self.status = self.NEED_RECOMPILE
+        src = latest_mtime(self.src)
+        build = latest_mtime(pjoin(self.src,'build'))
         
+        # binary should be more recent than source
+        if src[0] > build[0]:
+            self.status = self.NEED_RECOMPILE
+            self.latest = src[1]
+            return
+        
+        self.latest = self.binary
         # also more recent than duels
         server_stats = os.stat(pjoin(self.src,'build',self.binary))
         if server_stats.st_mtime < self.duels_mtime:
-            self.status = self.NEED_RECOMPILE
+            self.status = self.NEED_RECOMPILE            
+            return
         
         # also installed version should be the same
-        if server_stats.st_size == os.stat(pjoin(duels_path,'bin',self.binary)).st_size:
-            self.status = self.OK
-        else:
+        self.status = self.OK
+        if server_stats.st_size != os.stat(pjoin(duels_path,'bin',self.binary)).st_size:
+            # reinstall
+            res = input(self.name + ': latest version does not seem to be installed. Install? [Y/n] ')
+            if res not in ('n','N'):
+                check_output(['make', 'install'], cwd=pjoin(self.src,'build'))
+                return                
             self.status = self.NEED_RECOMPILE
+            
+    def info(self, info):
+        if info == self.NEED_RECOMPILE:
+            return '{} ({})'.format(self.name, self.latest)
+        return self.name
+        
   
     def get_status(self):
         for f in (self.check_installed, self.check_local_flag, self.check_mtime):
@@ -139,7 +167,7 @@ for directory,subdirs,files in os.walk(duels_path + '/..'):
         subdirs.clear()
     
 # get last global include modification time
-Game.duels_mtime = latest_mtime(pjoin(duels_path, 'include'), [game.name for game in games])[0]
+Game.register_duels_mtime(games)
 
 for game in games:
     game.get_status()
@@ -150,7 +178,7 @@ games = dict((status, [game for game in games if game.status == status]) for sta
 # print summary
 for status in Game.msg:
     if len(games[status]):
-        print('- {}: {}'.format(Game.msg[status], ', '.join(game.name for game in games[status])))
+        print('- {}: {}'.format(Game.msg[status], ', '.join(game.info(status) for game in games[status])))
 print()
 if len(games[Game.OK]):
     print('Will ship with {} '.format(', '.join(game.name for game in games[Game.OK])))
@@ -181,11 +209,13 @@ control_file = pjoin(deb_root, 'DEBIAN', 'control')
 
 if os.path.exists(control_file):
     with open(control_file) as f:
-        version = f.read().splitlines()[1].strip()
-    msg = 'Previous version: ' + version.split()[-1]
+        version = f.read().splitlines()[1].strip().split()[-1]
+    msg = 'Previous version: ' + version
 else:
     msg = 'No previous version'
-version = input(msg + ' / packaged version? ')
+new_version = input(msg + ' / packaged version? [{}] '.format(version))
+if new_version == '':
+    new_version = version
 
 if os.path.exists(deb_root):
     run(['sudo','rm','-rf',deb_root])
@@ -216,3 +246,6 @@ with open(control_file, 'w') as f:
 run(['sudo','chown', 'root:root', '.', '-R'], cwd = deb_root)
 run(['dpkg-deb', '--build', 'duels'], cwd = pjoin(duels_path, 'deb'))
 
+if install:
+    print('Installing package...')
+    run(['sudo', 'dpkg', '-i', pjoin(duels_path, 'deb', 'duels.deb')])

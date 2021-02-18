@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 import sys
 sys.path.insert(1, sys.argv[1])
-print('Called with ' + sys.argv[1])
 from duels import Subscriber
-game = Subscriber()
-init_msg = game.get_init() 
+game = Subscriber(<server_timeout>)
+init_msg = game.get_init()
 
 # add other imports here /(e.g. pygame) 
 
@@ -20,12 +19,12 @@ game.ready()
 
 while True:
     msg = game.refresh()
-    if msg.winner:
+    if game.winner:
         break
     
     # update display from fields
     
     
     
-# update display from winner
+# update display from game.winner (1 or 2, or -1 if bug) and game.reason (why they have won)
 

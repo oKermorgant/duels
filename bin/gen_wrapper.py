@@ -3,6 +3,27 @@ import sys
 import yaml
 import os
 
+
+
+def read_file(filename, to_lines = True):
+    with open(filename) as f:
+        content = f.read()
+    if to_lines:
+        return content.splitlines()
+    return content
+
+def write_file(filename, content):
+    with open(filename, 'w') as f:
+        if isinstance(content, str):
+            f.write(content)
+        else:
+            f.write('\n'.join(content))
+            
+def dict_replace(s, d):
+    for key in d:
+        s = s.replace('<'+key+'>', str(d[key]))
+    return s       
+
 class Info:
     def __init__(self, key):
         self.type, key = key.split()
@@ -68,8 +89,8 @@ def build_headers(game, description, game_path):
         header.append(msg_derived(names[-1], description[field], field))
         
     header.append('}\n}\n#endif')
-    with open(include_path + '/msg.h', 'w') as f:
-        f.write('\n'.join(header))
+    
+    write_file(include_path + '/msg.h', header)
         
     # generate client.h
     guard = game.upper() + '_GAME_H'
@@ -83,27 +104,21 @@ namespace {game} {{
 class Game: public duels::Client<inputMsg, feedbackMsg>
 {{
 public:
-  Game(std::string name, int difficulty = 1)
-    : Game(name, difficulty, "local_game", "") {{}}
-  Game(std::string name, std::string ip, int difficulty = 1)
-      : Game(name, difficulty, ip, "") {{}}
-  Game(std::string name, std::string ip, std::string server_args)
-      : Game(name, 0, ip, server_args) {{}}
+  Game(int argc, char** argv, std::string name, int difficulty = 1)
+    : Game(argc, argv, name, difficulty, "localhost") {{}}
+  Game(int argc, char** argv, std::string name, std::string ip, int difficulty = 1)
+      : Game(argc, argv, name, difficulty, ip) {{}}
 private:
-  Game(std::string name, int difficulty, std::string ip, std::string server_args)
+  Game(int argc, char** argv, std::string name, int difficulty, std::string ip)
       : duels::Client<inputMsg, feedbackMsg>(
-      {timeout}, name, difficulty, ip, "{game}", server_args) {{}}
+      argc, argv, {timeout}, {server_timeout}, name, difficulty, ip, "{game}") {{}}
 }};
 }}
 }}
 #endif'''
-    with open(include_path + '/game.h', 'w') as f:
-        f.write(header.format(guard=guard, game=game, timeout=description['timeout']))
+
+    write_file(include_path + '/game.h', header.format(guard=guard, game=game, timeout=description['timeout'], server_timeout=description['server_timeout']))
         
-def dict_replace(s, d):
-    for key in d:
-        s = s.replace('<'+key+'>', str(d[key]))
-    return s
 
 if __name__ == '__main__':
     
@@ -130,10 +145,36 @@ if __name__ == '__main__':
         description['timeout'] = 100
     if 'refresh' not in description:
         description['refresh'] = description['timeout']
+    if 'server_timeout' not in description:
+        description['server_timeout'] = 3*description['timeout']
     if 'turn_based' not in description:
         description['turn_based'] = False
     description['game'] = game
     description['duels_path'] = duels_path[:-1]
+    
+    # erase times if detected in source
+    if os.path.exists(game_path + 'server.cpp'):
+        check_for = ['Timeout', 'Refresh']
+        for line in read_file(game_path + 'server.cpp'):
+            if len(check_for) == 0:
+                break
+            
+            for key in check_for:
+                idx = line.find(key)
+                if idx > abs(line.find('//')):                    
+                    value = line[idx+len(key):].split(')')
+                    try:
+                        value = int(''.join(c for c in value[0] if c.isdigit()))
+                        if value != description[key.lower()]:
+                            print('{}: set to {} ms in config but is {} ms in server.cpp'.format(key, description[key.lower()], value))
+                            description[key.lower()] = value
+                        check_for.remove(key)
+                    except:
+                        pass
+                        
+    
+    def adapt(file_in, file_out):
+        write_file(file_out, dict_replace(read_file(file_in, False), description))
     
     # create directories
     for d in ('include', 'include/duels', 'include/duels/'+game, 'client_template'):
@@ -155,10 +196,7 @@ if __name__ == '__main__':
         if os.path.exists(dst_path):
             print('Skipping {}, file exists'.format(dst_path))
         else:
-            with open(duels_path + 'templates/server/' + src) as f:
-                content = f.read()
-            with open(dst_path, 'w') as f:
-                f.write(dict_replace(content, description))
+            adapt(duels_path + 'templates/server/' + src, dst_path)
                 
     # copy client templates
     for src,dst in (('CMakeLists.txt','CMakeLists.txt'), ('game.cpp', game+'.cpp')):
@@ -166,7 +204,4 @@ if __name__ == '__main__':
         if os.path.exists(dst_path):
             print('Skipping {}, file exists'.format(dst_path))
         else:
-            with open(duels_path + 'templates/client/' + src) as f:
-                content = f.read()
-            with open(dst_path, 'w') as f:
-                f.write(dict_replace(content, description))
+            adapt(duels_path + 'templates/client/' + src, dst_path)

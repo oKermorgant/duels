@@ -2,9 +2,9 @@
 
 using namespace duels::<game>;
 
-int main()
+int main(int argc, char** argv)
 {
-  Game game("your name");
+  Game game(argc, argv, "your name");
 
   inputMsg input;
   feedbackMsg feedback;

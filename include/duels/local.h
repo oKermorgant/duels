@@ -8,30 +8,16 @@
 #include <algorithm>
 #include <condition_variable>
 #include <duels/game_state.h>
-#include <duels/zmq.hpp>
+#include <duels/zmq_io.h>
 #include <unistd.h>
 #include <iostream>
 
 namespace duels
 {
 
-namespace
-{
-
-enum class Client{OK, TIMEOUT, DISCONNECT};
-
-std::string tcp_transport(int port = 0)
-{
-    std::stringstream ss;
-    ss << "tcp://*:" << port;
-    return ss.str();
-}
-}
-
 enum class Player {One, Two};
 
-template <class initMsg, class inputMsg, class feedbackMsg, class displayMsg,
-          int timeout, int refresh>
+template <class initMsg, class inputMsg, class feedbackMsg, class displayMsg>
 class LocalGame
 {
 public:
@@ -52,14 +38,17 @@ public:
         return difficulty;
     }
 
-    LocalGame() : sock(ctx, zmq::socket_type::pub), refresh_ms(refresh) {}
+    LocalGame(Timeout, Refresh refresh) : sock(ctx, zmq::socket_type::pub), rate(refresh) {}
+    LocalGame(Refresh refresh, Timeout timeout) : LocalGame(timeout, refresh) {}
 
     void initDisplay(const initMsg &init_msg, const std::string &game, bool run_display = true)
     {
         // base port similar to server
         // +2 -> display out
         // +3 -> display 1 in
-        const int port = 3000;
+        const int port(3000);
+        const int port_display(port+2);
+        const int port_shake(port+3);
 
         if(run_display)
         {
@@ -67,7 +56,7 @@ public:
             std::stringstream ss;
             ss << "python3 " << GAME_SOURCE_DIR << "/" << game << "_gui.py" << " " << DUELS_BIN_PATH
                << " 127.0.0.1 "
-               << port+3 << " "
+               << port_shake << " "
                << getpid() << " &";
             (void)system(ss.str().c_str());
         }
@@ -75,19 +64,19 @@ public:
         // send initial display info as rep-req
         const std::string req(init_msg.toYAMLString("Player_AI", "Game_AI [" + std::to_string(difficulty) + "]"));
 
-        sock.bind(tcp_transport(port+2));
+        sock.bind("tcp://*:" + std::to_string(port_display));
         zmq::socket_t shake(ctx, zmq::socket_type::req);
-        shake.bind(tcp_transport(port+3));
+        shake.bind("tcp://*:" + std::to_string(port_shake));
         zmq::message_t zmsg(req.data(), req.length());
         shake.send(zmsg, zmq::send_flags::none);
-        shake.recv(zmsg);
+        (void) shake.recv(zmsg);
         shake.close();
         wait(100);
     }
 
     double samplingTime() const
     {
-        return refresh*0.001;
+        return rate.ms.count()*0.001;
     }
 
     void wait(uint ms) const
@@ -111,8 +100,7 @@ public:
 
     void sendDisplay(const displayMsg &display_msg, int winner = 0)
     {
-        std::this_thread::sleep_until(refresh_last + refresh_ms);
-        refresh_last = std::chrono::steady_clock::now();
+        rate.sleep();
         const std::string msg(display_msg.toYAMLString(winner));
         zmq::message_t zmsg(msg.data(), msg.length());
         sock.send(zmsg, zmq::send_flags::none);
@@ -132,8 +120,7 @@ private:
     zmq::socket_t sock;
     int difficulty = 0;
 
-    std::chrono::steady_clock::time_point refresh_last = std::chrono::steady_clock::now();
-    const std::chrono::milliseconds refresh_ms;
+    Refresh rate;
 };
 }
 
