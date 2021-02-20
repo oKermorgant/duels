@@ -9,7 +9,7 @@ from shutil import copy
 from subprocess import Popen, PIPE
 from random import shuffle
 import argparse
-from time import sleep
+from time import sleep, time
 
 try:
     import pylab as pl
@@ -59,7 +59,7 @@ if os.path.exists(args.file):
     with open(args.file) as f:
         elos = yaml.safe_load(f)
         
-stats = {'fair': 0, 'timeout': 0, 'disconnect': 0, 'game timeout': 0}
+stats = {'fair': 0, 'timeout': 0, 'disconnect': 0, 'game timeout': 0, 'mean time': .2}
 if 'stats' in elos:
     if args.reset:
         elos.pop('stats')
@@ -146,8 +146,8 @@ class Game:
                     elos[player]['opponents'][opponent] = 0
             
         self.name = os.path.basename(list(elos.values())[0]['exec'])
-        base_dir =  os.path.abspath(os.path.dirname(__file__) + '/..') 
-        self.server =  '{}/bin/{}_server'.format(base_dir, self.name)
+        bin_dir =  os.path.abspath(os.path.dirname(__file__)) 
+        self.server =  '{}/{}_server'.format(bin_dir, self.name)
         self.executor = ThreadPoolExecutor(args.parallel)
         self.progress = 0
         
@@ -271,7 +271,7 @@ class Game:
             fig = pl.figure(figsize=(max(7, n//3), max(4, n//3)))
             
             hist = [[pl.name]+elos[pl.name]['elo'] for pl in self.players]
-            hist.sort(key = lambda x: -int(x[-1]))
+            hist.sort(key = lambda x: -pl.mean(x[1:]))
             
             hist = pl.array(hist)
             names, hist = hist[:,0], pl.array(hist[:,1:], dtype=int)
@@ -279,9 +279,9 @@ class Game:
             N = hist.shape[1]+1
             x = range(1, N)
             for i,name in enumerate(names):
-                pl.plot(x, hist[i], label='{} ({})'.format(name, hist[i][-1]))
+                pl.plot(x, [pl.mean(hist[i][:k]) for k in range(1, N)], label='{} ({})'.format(name, int(pl.mean(hist[i]))))
             pl.gca().set_xticks(range(1,N,max(1, int(pl.ceil(N/n)))))
-            pl.xlabel('Tournament')
+            pl.xlabel('Tournaments')
             pl.ylabel('Elo score')
             pl.legend(loc = 'upper left')
             fig.tight_layout()
@@ -291,11 +291,32 @@ class Game:
         
 game = Game()        
 
+# estimate time to run all this
+n = len(game.players) - args.bots
+m = n*(n-1 + n*args.bots)
+if stats['mean time']:
+    r = input('Estimated time: {} s, continue? [Y/n] '.format(round(m*args.tournaments*stats['mean time']/args.parallel, 1)))
+
+if r in ('n', 'N'):
+    sys.exit(0)
+    
+t0 = time()
+
+played_matches = sum(stats[key] for key in stats if key != 'mean time')
+# time to do all the games
+dt = stats['mean time'] * played_matches
 
 for t in range(args.tournaments):
     game.run_tournament(t, args.tournaments)
     
+print('Actual time: {} s (estimated = {} s)'.format(round(time() - t0, 1), round(m*args.tournaments*stats['mean time']/args.parallel, 1)))
+# additional time without multithread
+dt += (time() - t0) * args.parallel
+played_matches += m*args.tournaments
+
+stats['mean time'] = dt/played_matches
+
 game.write_results()
 
 for p in game.players:
-    print('{} : elo = {} / matches = {}'.format(p.name, p.elo, p.matches))
+    print('{} : {}'.format(p.name, p.elo))
