@@ -42,7 +42,12 @@ inline void printWinner(const std::string &name, State state)
 template <class T>
 void print(std::string s, T val)
 {
-    std::cout << "[server] " << s << " = " << val << std::endl;
+    //std::cout << "[" + current_time("server") << "] " << s << " = " << val << std::endl;
+}
+
+void print(std::string s)
+{
+    //std::cout << "[" + current_time("server") << "] " << s << std::endl;
 }
 
 enum class Player {One, Two};
@@ -51,6 +56,8 @@ template <class initMsg, class inputMsg, class feedbackMsg, class displayMsg>
 class Server
 {
     using PlayerIO = Interface<inputMsg, feedbackMsg>;
+
+    static constexpr bool use_threads = false;
 
 public:
 
@@ -76,17 +83,23 @@ public:
         parser.getServerParam(name1, name2, difficulty);
 
         // wait for clients
-        p1 = std::make_unique<PlayerIO>(timeout, ctx, parser.clientURL(1), hasTwoPlayers());
+        print("Connecting to player1 @ " + parser.clientURL(1));
+        p1 = std::make_unique<PlayerIO>(timeout, ctx, parser.clientURL(1), use_threads && hasTwoPlayers());
         if(hasTwoPlayers())
-            p2 = std::make_unique<PlayerIO>(timeout, ctx, parser.clientURL(2), true);
+        {
+            print("Connecting to player2 @ " + parser.clientURL(2));
+            p2 = std::make_unique<PlayerIO>(timeout, ctx, parser.clientURL(2), use_threads);
+        }
 
         // send initial display info as rep-req
         if(use_display)
         {
+            print("Connecting to display @ " + parser.displayURL());
             const std::string req(init_msg.toYAMLString(name1,name2));
             sock.bind(parser.displayURL());
             for(int player = 1; player < (hasTwoPlayers()?3:2); ++player)
             {
+                print("Connecting shacking with display @ " + parser.shakeURL(player));
                 zmq::socket_t shake(ctx, zmq::socket_type::req);
                 shake.bind(parser.shakeURL(player));
                 zmq::message_t zmsg(req.data(), req.length());
@@ -116,9 +129,11 @@ public:
 
     bool sync(const Player &player, const feedbackMsg &msg, inputMsg &player_input)
     {
+        print("Sending state to ", player == Player::One ? "p1" : "p2");
         const auto &p = (player == Player::One)?p1:p2;
         p->send(msg);
         const auto state = p->waitForInput(player_input);
+        print("Got their input ", player == Player::One ? "p1" : "p2");
         return msg.state == State::ONGOING && state == Bond::OK;
     }
 
@@ -130,7 +145,10 @@ public:
     bool sync(const feedbackMsg &msg1, inputMsg &player1_input,
               const feedbackMsg &msg2, inputMsg &player2_input)
     {
-        // inform players anyway
+        if constexpr(use_threads)
+        {
+        //temptative for parallel listening - does not work
+         // inform players anyway
         p1->send(msg1);
         p2->send(msg2);
 
@@ -141,6 +159,12 @@ public:
                 && msg2.state == State::ONGOING
                 && status1 == Bond::OK
                 && status2 == Bond::OK;
+        }
+
+        const auto ok1(sync(Player::One, msg1, player1_input));
+        const auto ok2(sync(Player::Two, msg2, player2_input));
+
+        return ok1 && ok2;
     }
 
     void registerVictory(const Player &winner, feedbackMsg &msg1, feedbackMsg &msg2)
@@ -177,7 +201,7 @@ public:
 
         if(msg1.state == State::WIN_FAIR || msg1.state == State::WIN_TIMEOUT || msg1.state == State::WIN_DISCONNECT)
         {
-            printWinner(name1, msg2.state);
+            printWinner(name1, msg1.state);
             sendDisplay(display, msg1.state == State::WIN_FAIR ? 1 : -1);
         }
         else

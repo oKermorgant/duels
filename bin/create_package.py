@@ -4,6 +4,7 @@ import os
 from subprocess import run, check_output
 import shutil
 import sys
+import filecmp
 
 pjoin = os.path.join
 version = '1.1'
@@ -44,13 +45,15 @@ class Game:
     LOCAL_FLAG = 2
     NEED_RECOMPILE = 3
     NOT_SURE = 4
+    NEED_REINSTALL = 5
     
     msg = {}
     msg[OK] = 'ready to ship'
     msg[NOT_INSTALLED] = 'not installed'
     msg[LOCAL_FLAG] = 'source has #define LOCAL_GAME'
-    msg[NEED_RECOMPILE] = 'installed version less recent than duels library'
+    msg[NEED_RECOMPILE] = 'was compiled before latest changes in duels library'
     msg[NOT_SURE] = 'not checked'
+    msg[NEED_REINSTALL] = 'installed version is not last one'
 
     def __init__(self,directory):
         self.src = directory
@@ -58,6 +61,7 @@ class Game:
         self.binary = self.name + '_server'
         self.server = pjoin(directory, 'server.cpp')
         self.status = self.NOT_SURE
+        self.installed_files = self.files()
     
     @staticmethod
     def register_duels_mtime(games):
@@ -75,8 +79,7 @@ class Game:
         if not os.path.exists(install_manifest):
             return None
         with open(install_manifest) as f:
-            files = f.read().splitlines()
-        return files
+            return f.read().splitlines()
     
     def clean(self):
         print('Cleaning installed files for ' + self.name)
@@ -111,39 +114,62 @@ class Game:
             self.status = self.NEED_RECOMPILE
             self.latest = src[1]
             return
-        
-        self.latest = self.binary
+                
         # also more recent than duels
         server_stats = os.stat(pjoin(self.src,'build',self.binary))
         if server_stats.st_mtime < self.duels_mtime:
+            self.latest = self.binary
             self.status = self.NEED_RECOMPILE            
             return
+            
+    def check_installed_version(self):
         
-        # also installed version should be the same
-        self.status = self.OK
-        if server_stats.st_size != os.stat(pjoin(duels_path,'bin',self.binary)).st_size:
+        to_check = dict([(os.path.basename(f), f) for f in self.installed_files])
+        to_check.pop('CMakeLists.txt')
+        self.latest = None
+        
+        # look for all installed files in the game dev folder
+        for directory, subdirs, files in os.walk(self.src):            
+            
+            if '.git' in subdirs:
+                subdirs.pop('.git')
+                
+            for f in list(to_check.keys()):
+                if f in files:
+                    if filecmp.cmp(pjoin(directory, f), to_check[f]):
+                        to_check.pop(f)
+                    else:
+                        self.latest = f
+            if len(to_check) == 0:
+                break
+            
+        if len(to_check):
+            print('   could not find following dev files for {}: {}'.format(self.name, ', '.join(to_check.keys())))
+            
+        if self.latest:
             # reinstall
-            res = input(self.name + ': latest version does not seem to be installed. Install? [Y/n] ')
+            res = input(self.name + ': latest version does not seem to be installed ({}). Install? [Y/n] '.format(self.latest))
             if res not in ('n','N'):
                 check_output(['make', 'install'], cwd=pjoin(self.src,'build'))
-                return                
-            self.status = self.NEED_RECOMPILE
+                return
+            self.status = self.NEED_REINSTALL
             
     def info(self, info):
-        if info == self.NEED_RECOMPILE:
+        if info in (self.NEED_RECOMPILE, self.NEED_REINSTALL):
             return '{} ({})'.format(self.name, self.latest)
         return self.name
         
-  
     def get_status(self):
-        for f in (self.check_installed, self.check_local_flag, self.check_mtime):
+        for f in (self.check_installed, self.check_local_flag, self.check_mtime, self.check_installed_version):
             if self.status == self.NOT_SURE:
                 f()
             else:
                 break
+        if self.status == self.NOT_SURE:
+            self.status = self.OK            
    
     def update_client(self):
-        print('Updating ' + self.name)
+        print('Updating client template for ' + self.name)
         client_cmake = pjoin(duels_path, 'games', self.name, 'CMakeLists.txt')
         with open(client_cmake) as f:
             cmake = f.read().splitlines()
@@ -214,8 +240,8 @@ if os.path.exists(control_file):
 else:
     msg = 'No previous version'
 new_version = input(msg + ' / packaged version? [{}] '.format(version))
-if new_version == '':
-    new_version = version
+if new_version != '':
+    version = new_version
 
 if os.path.exists(deb_root):
     run(['sudo','rm','-rf',deb_root])

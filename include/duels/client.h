@@ -9,15 +9,17 @@
 
 namespace duels
 {
-
+namespace
+{
 template <class T>
 void print(std::string s, T val={})
 {
-    std::cout << "[client] " << s << " = " << val << std::endl;
+    //std::cout << "[" << current_time("client") << "] " << s << " = " << val << std::endl;
 }
 void print(std::string s)
 {
-    std::cout << "[client] " << s << std::endl;
+    //std::cout << "[" << current_time("client") << "] " << s << std::endl;
+}
 }
 
 template <class inputMsg, class feedbackMsg>
@@ -91,7 +93,10 @@ public:
             ss << server_dir << "/" << game << "_server";
             ss << " -p " << parser.port();
             ss << " -n1 '" << name << "'";
-            ss << " -d " << difficulty << " &";
+            ss << " -d " << difficulty;
+            if(!parser.displayPort())
+                ss << " --nodisplay";
+            ss << " &";
             (void)system(ss.str().c_str());
         }
 
@@ -108,14 +113,17 @@ public:
         }
 
         // connect to server as REP
+        print("Connecting to server @ " + parser.serverURL());
         sock.setsockopt( ZMQ_LINGER, 0 );
         sock.connect(parser.serverURL());
     }
 
     bool get(feedbackMsg &msg)
     {
+
         static bool first_contact(true);
 
+        print("waiting feedback", first_contact);
         if(first_contact)
         {
             // no timeout
@@ -161,6 +169,7 @@ public:
 
     void send(const inputMsg &msg)
     {
+        print("sending input");
         if(timeout.tooLongSince(feedback_time))
             looks_like_timeout = true;
         zmq::message_t zmsg(&msg, sizeof(msg));

@@ -145,8 +145,6 @@ if __name__ == '__main__':
         description['timeout'] = 100
     if 'refresh' not in description:
         description['refresh'] = description['timeout']
-    if 'server_timeout' not in description:
-        description['server_timeout'] = 3*description['timeout']
     if 'turn_based' not in description:
         description['turn_based'] = False
     description['game'] = game
@@ -171,6 +169,8 @@ if __name__ == '__main__':
                         check_for.remove(key)
                     except:
                         pass
+    if 'server_timeout' not in description:
+        description['server_timeout'] = 2*(description['timeout'] + description['refresh'])
                         
     
     def adapt(file_in, file_out):
