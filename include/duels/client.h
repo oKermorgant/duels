@@ -14,11 +14,11 @@ namespace
 template <class T>
 void print(std::string s, T val={})
 {
-    //std::cout << "[" << current_time("client") << "] " << s << " = " << val << std::endl;
+   // std::cout << "[" << current_time("client") << "] " << s << " = " << val << std::endl;
 }
 void print(std::string s)
 {
-    //std::cout << "[" << current_time("client") << "] " << s << std::endl;
+  //  std::cout << "[" << current_time("client") << "] " << s << std::endl;
 }
 }
 
@@ -120,7 +120,6 @@ public:
 
     bool get(feedbackMsg &msg)
     {
-
         static bool first_contact(true);
 
         print("waiting feedback", first_contact);
@@ -172,8 +171,7 @@ public:
         print("sending input");
         if(timeout.tooLongSince(feedback_time))
             looks_like_timeout = true;
-        zmq::message_t zmsg(&msg, sizeof(msg));
-        sock.send(zmsg, zmq::send_flags::none);
+        send_timeout(sock, msg, timeout);
     }
 
 };

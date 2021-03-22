@@ -39,27 +39,27 @@ int main(int argc, char** argv)
   const bool two_players = game_io.hasTwoPlayers();
 #endif
 
-  int turn(2);
-  const std::array<Player, 2> players{Player::One, Player::Two};
+  Player player;
   while(true)
   {
-    // switch player
-    turn = 3-turn;
-
-    // build current player feedback
+    // build current player feedback (feedback1 or feedback2)
 
 
 
-    // request player action
-    if(turn == 1)
+    // request player 1 action
+    if(player.isPlayerOne())
     {
 #ifndef LOCAL_GAME
       // sync with player 1, exits if needed
       if(!game_io.sync(Player::One, feedback1, input))
         break;
 #else
-      // write dumb player AI from feedback1 to input
+      // TODO write dumb player AI from feedback1 to input
 
+      
+      
+      
+      
       
       
 #endif
@@ -74,8 +74,11 @@ int main(int argc, char** argv)
 #endif
     else
     {
-      // game AI goes here: compute input from feedback2
+      // TODO game AI goes here: compute input from feedback2
 
+        
+        
+        
 
     }
 
@@ -90,12 +93,15 @@ int main(int argc, char** argv)
     // check if any regular winner after this turn
     if(false)
     {
-      //if(...)
-      game_io.registerVictory(Player::One, feedback1, feedback2);
+      //if(current player wins)
+      game_io.registerVictory(player, feedback1, feedback2);
       //else
-      game_io.registerVictory(Player::Two, feedback1, feedback2);
+      game_io.registerVictory(player.opponent(), feedback1, feedback2);
       break;
     }
+    
+    // switch player
+    player.change();
   }
 
   game_io.sendResult(display, feedback1, feedback2);

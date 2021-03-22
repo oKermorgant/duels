@@ -11,6 +11,7 @@
 #include <duels/zmq_io.h>
 #include <duels/game_state.h>
 #include <duels/parser.h>
+#include <duels/player.h>
 
 namespace duels
 {
@@ -37,20 +38,21 @@ inline void printWinner(const std::string &name, State state)
     }
     std::cout << "Winner: " << name << " (" << why << ")" << std::endl;
 }
-}
 
+// debug functions
 template <class T>
 void print(std::string s, T val)
 {
-    //std::cout << "[" + current_time("server") << "] " << s << " = " << val << std::endl;
+    //std::cout << "[server] " << s << " = " << val << std::endl;
 }
 
 void print(std::string s)
 {
-    //std::cout << "[" + current_time("server") << "] " << s << std::endl;
+    //std::cout << "[server] " << s << std::endl;
 }
 
-enum class Player {One, Two};
+}
+
 
 template <class initMsg, class inputMsg, class feedbackMsg, class displayMsg>
 class Server
@@ -74,6 +76,11 @@ public:
         sock(ctx, zmq::socket_type::pub), rate(period), timeout(timeout) {}
 
     Server(Refresh refresh, Timeout timeout) : Server(timeout, refresh) {}
+
+    Player player() const
+    {
+        return {1};
+    }
 
     void initDisplay(int argc, char** argv, const initMsg &init_msg)
     {
@@ -109,7 +116,8 @@ public:
             }
             wait(100);
         }
-
+        else
+            wait(100);
     }
 
     double samplingTime() const
@@ -129,17 +137,15 @@ public:
 
     bool sync(const Player &player, const feedbackMsg &msg, inputMsg &player_input)
     {
-        print("Sending state to ", player == Player::One ? "p1" : "p2");
-        const auto &p = (player == Player::One)?p1:p2;
+        print("Sending state to ", player.which());
+        const auto &p = player.isPlayerOne()?p1:p2;
         p->send(msg);
-        const auto state = p->waitForInput(player_input);
-        print("Got their input ", player == Player::One ? "p1" : "p2");
-        return msg.state == State::ONGOING && state == Bond::OK;
-    }
 
-    bool sync(const feedbackMsg &msg, inputMsg &player_input)
-    {
-        return sync(Player::One, msg, player_input);
+        print("feedback sent -> msg.state = OnGoing", msg.state == State::ONGOING);
+        const auto bond = p->waitForInput(player_input);
+        print("Got their input ", player.isPlayerOne() ? "p1" : "p2");
+        print("bond OK", bond == Bond::OK);
+        return msg.state == State::ONGOING && bond == Bond::OK;
     }
 
     bool sync(const feedbackMsg &msg1, inputMsg &player1_input,
@@ -147,18 +153,18 @@ public:
     {
         if constexpr(use_threads)
         {
-        //temptative for parallel listening - does not work
-         // inform players anyway
-        p1->send(msg1);
-        p2->send(msg2);
+            //temptative for parallel listening - does not work
+            // inform players anyway
+            p1->send(msg1);
+            p2->send(msg2);
 
-        const auto status1 = p1->waitForInput(player1_input);
-        const auto status2 = p2->waitForInput(player2_input);
+            const auto status1 = p1->waitForInput(player1_input);
+            const auto status2 = p2->waitForInput(player2_input);
 
-        return msg1.state == State::ONGOING
-                && msg2.state == State::ONGOING
-                && status1 == Bond::OK
-                && status2 == Bond::OK;
+            return msg1.state == State::ONGOING
+                    && msg2.state == State::ONGOING
+                    && status1 == Bond::OK
+                    && status2 == Bond::OK;
         }
 
         const auto ok1(sync(Player::One, msg1, player1_input));
@@ -172,12 +178,12 @@ public:
         msg1.state = State::WIN_FAIR;
         msg2.state = State::LOSE_FAIR;
 
-        if(winner == Player::Two)
+        if(winner.isPlayerTwo())
             std::swap(msg1.state, msg2.state);
     }
 
     void sendResult(const displayMsg &display, feedbackMsg &msg1, feedbackMsg &msg2)
-    {        
+    {
         if(p1->status == Bond::TIMEOUT)
         {
             msg1.state = State::LOSE_TIMEOUT;
@@ -226,6 +232,7 @@ public:
             return;
 
         rate.sleep();
+
         const std::string msg(display.toYAMLString(winner));
         zmq::message_t zmsg(msg.data(), msg.length());
         sock.send(zmsg, zmq::send_flags::none);
@@ -243,6 +250,7 @@ private:
     Timeout timeout;
     Refresh rate;
 };
+
 
 }
 

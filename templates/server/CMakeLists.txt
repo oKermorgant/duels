@@ -4,7 +4,7 @@ project(<game>_server CXX)
 SET(DUELS_ROOT "<duels_path>" CACHE STRING "Path to duels dev folder")
 set(CMAKE_INSTALL_PREFIX ${DUELS_ROOT})
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Debug)
 add_compile_options(-pthread)
 find_package (Threads)

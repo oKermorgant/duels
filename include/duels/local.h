@@ -9,13 +9,12 @@
 #include <condition_variable>
 #include <duels/game_state.h>
 #include <duels/zmq_io.h>
+#include <duels/player.h>
 #include <unistd.h>
 #include <iostream>
 
 namespace duels
 {
-
-enum class Player {One, Two};
 
 template <class initMsg, class inputMsg, class feedbackMsg, class displayMsg>
 class LocalGame
@@ -26,6 +25,11 @@ public:
     {
         sock.close();
         ctx.close();
+    }
+
+    Player player() const
+    {
+        return {1};
     }
 
     void setLevel(int level)
@@ -86,7 +90,7 @@ public:
 
     void registerVictory(const Player &player, feedbackMsg &msg1, feedbackMsg &msg2)
     {
-        if(player == Player::One)
+        if(player.isPlayerOne())
         {
             msg1.state = State::WIN_FAIR;
             msg2.state = State::LOSE_FAIR;
@@ -106,7 +110,7 @@ public:
         sock.send(zmsg, zmq::send_flags::none);
     }
 
-    void sendResult(const displayMsg &display, feedbackMsg &msg1, feedbackMsg &msg2)
+    void sendResult(const displayMsg &display, feedbackMsg &msg1, feedbackMsg &)
     {
         if(msg1.state == State::WIN_FAIR || msg1.state == State::WIN_TIMEOUT || msg1.state == State::WIN_DISCONNECT)
             sendDisplay(display, 1);
