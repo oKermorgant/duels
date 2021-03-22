@@ -378,32 +378,33 @@ names = dict([(i,player.name) for i,player in enumerate(game.players)])
 if not args.tournaments:
     print('Available players (stored in names):')
     print(names)
-    sys.exit(0)
 
-# estimate time to run all this
-n = len(game.players) - args.bots
-m = n*(n-1 + n*args.bots)
-if stats['mean time']:
-    r = input('Estimated time: {} s, continue? [Y/n] '.format(round(m*args.tournaments*stats['mean time']/args.parallel, 1)))
+else:
 
-if r in ('n', 'N'):
-    sys.exit(0)
+    # estimate time to run all this
+    n = len(game.players) - args.bots
+    m = n*(n-1 + n*args.bots)
+    if stats['mean time']:
+        r = input('Estimated time: {} s, continue? [Y/n] '.format(round(m*args.tournaments*stats['mean time']/args.parallel, 1)))
+
+    if r in ('n', 'N'):
+        sys.exit(0)
     
-t0 = time()
+    t0 = time()
 
-played_matches = sum(stats[key] for key in stats if key != 'mean time')
-# time to do all the games
-dt = stats['mean time'] * played_matches
+    played_matches = sum(stats[key] for key in stats if key != 'mean time')
+    # time to do all the games
+    dt = stats['mean time'] * played_matches
 
-for t in range(args.tournaments):
-    game.run_tournament(t, args.tournaments)
-    
-print('Actual time: {} s (estimated = {} s)'.format(round(time() - t0, 1), round(m*args.tournaments*stats['mean time']/args.parallel, 1)))
-# additional time without multithread
-dt += (time() - t0) * args.parallel
-played_matches += m*args.tournaments
+    for t in range(args.tournaments):
+        game.run_tournament(t, args.tournaments)
+        
+    print('Actual time: {} s (estimated = {} s)'.format(round(time() - t0, 1), round(m*args.tournaments*stats['mean time']/args.parallel, 1)))
+    # additional time without multithread
+    dt += (time() - t0) * args.parallel
+    played_matches += m*args.tournaments
 
-stats['mean time'] = dt/played_matches
+    stats['mean time'] = dt/played_matches
 
 game.write_results()
 
