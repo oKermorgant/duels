@@ -1,0 +1,7 @@
+timeout: 100 #ms
+refresh: 1000
+init: []
+input: [int s]
+feedback: [int a, int b]
+display: []
+turn_based: True

@@ -14,11 +14,11 @@ namespace
 template <class T>
 void print(std::string s, T val={})
 {
-   // std::cout << "[" << current_time("client") << "] " << s << " = " << val << std::endl;
+   std::cout << "[" << current_time("client") << "] " << s << " = " << val << std::endl;
 }
 void print(std::string s)
 {
-  //  std::cout << "[" << current_time("client") << "] " << s << std::endl;
+  std::cout << "[" << current_time("client") << "] " << s << std::endl;
 }
 }
 
@@ -86,34 +86,42 @@ public:
 
         if(parser.localServer())
         {
-            (void)system(("killall " + game + "_server -q").c_str());
+            run("killall " + game + "_server -q");
 
             // launch local game
-            std::stringstream ss;
-            ss << server_dir << "/" << game << "_server";
-            ss << " -p " << parser.port();
-            ss << " -n1 '" << name << "'";
-            ss << " -d " << difficulty;
+            std::stringstream cmd;
+            cmd << server_dir << "/" << game << "_server";
+            cmd << " -p " << parser.port();
+            if(difficulty < 0)  // request to play as player 2
+            {
+                cmd << " -n2 '" << name << "'";
+                cmd << " -n1 " << -difficulty;
+            }
+            else
+            {
+                cmd << " -n1 '" << name << "'";
+                cmd << " -n2 " << difficulty;
+            }
             if(!parser.displayPort())
-                ss << " --nodisplay";
-            ss << " &";
-            (void)system(ss.str().c_str());
+                cmd << " --nodisplay";
+            cmd << " &";
+            run(cmd);
         }
 
         // open display for this game
         if(parser.displayPort())
         {
-            std::stringstream ss;
-            ss << "python3 " << gui_dir << "/" << game << "_gui.py"
+            std::stringstream cmd;
+            cmd << "python3 " << gui_dir << "/" << game << "_gui.py"
                << " " << DUELS_BIN_PATH
                << " " << parser.serverIP()
                << " " << parser.displayPort()
                << " " << pid << " &";
-            (void)system(ss.str().c_str());
+            run(cmd);
         }
 
         // connect to server as REP
-        print("Connecting to server @ " + parser.serverURL());
+        //print("Connecting to server @ " + parser.serverURL());
         sock.setsockopt( ZMQ_LINGER, 0 );
         sock.connect(parser.serverURL());
     }
@@ -122,7 +130,6 @@ public:
     {
         static bool first_contact(true);
 
-        print("waiting feedback", first_contact);
         if(first_contact)
         {
             // no timeout
@@ -168,7 +175,6 @@ public:
 
     void send(const inputMsg &msg)
     {
-        print("sending input");
         if(timeout.tooLongSince(feedback_time))
             looks_like_timeout = true;
         send_timeout(sock, msg, timeout);

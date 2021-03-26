@@ -7,6 +7,7 @@
 #include <string.h>
 #include <iostream>
 #include <algorithm>
+#include <unistd.h>
 
 #include <duels/zmq_io.h>
 #include <duels/game_state.h>
@@ -43,14 +44,21 @@ inline void printWinner(const std::string &name, State state)
 template <class T>
 void print(std::string s, T val)
 {
-    //std::cout << "[server] " << s << " = " << val << std::endl;
+    std::cout << "[server] " << s << " = " << val << std::endl;
 }
 
 void print(std::string s)
 {
-    //std::cout << "[server] " << s << std::endl;
+    std::cout << "[server] " << s << std::endl;
 }
 
+template <class inputMsg, class feedbackMsg>
+class RemotePlayer : public Player<inputMsg, feedbackMsg>
+{
+public:
+    inline RemotePlayer(PlayerType type) : Player<inputMsg, feedbackMsg>(type) {}
+    constexpr inline void updateInput() override {}
+};
 }
 
 
@@ -58,6 +66,7 @@ template <class initMsg, class inputMsg, class feedbackMsg, class displayMsg>
 class Server
 {
     using PlayerIO = Interface<inputMsg, feedbackMsg>;
+    using PlayerPtr = std::unique_ptr<Player<inputMsg, feedbackMsg>>;
 
     static constexpr bool use_threads = false;
 
@@ -66,49 +75,92 @@ public:
     ~Server()
     {
         sock.close();
-        p1.reset();
-        if(hasTwoPlayers())
+        if(p1)
+            p1.reset();
+        if(p2)
             p2.reset();
         ctx.close();
     }
 
-    Server(Timeout timeout, Refresh period) :
-        sock(ctx, zmq::socket_type::pub), rate(period), timeout(timeout) {}
+    Server(std::string game, Timeout timeout, Refresh period) :
+        sock(ctx, zmq::socket_type::pub), rate(period), timeout(timeout), game(game) {}
 
-    Server(Refresh refresh, Timeout timeout) : Server(timeout, refresh) {}
+    Server(std::string game, Refresh refresh, Timeout timeout) : Server(game, timeout, refresh) {}
 
-    Player player() const
+    template <class GameAI>
+    std::pair<PlayerPtr, PlayerPtr>
+    initPlayers(int argc, char** argv, const initMsg &init_msg, int ai1_level, int ai2_level)
     {
-        return {1};
-    }
+        static_assert(std::is_base_of<Player<inputMsg, feedbackMsg>, GameAI>::value, "Your game AI class should inherit from Player<inputMsg, feedbackMsg>");
 
-    void initDisplay(int argc, char** argv, const initMsg &init_msg)
-    {
         ArgParser parser(argc, argv);
-
         use_display = parser.displayPort();
-        parser.getServerParam(name1, name2, difficulty);
 
-        // wait for clients
-        print("Connecting to player1 @ " + parser.clientURL(1));
-        p1 = std::make_unique<PlayerIO>(timeout, ctx, parser.clientURL(1), use_threads && hasTwoPlayers());
-        if(hasTwoPlayers())
+        // build players depending on name or not
+        std::pair<PlayerPtr, PlayerPtr> players;
+
+        const auto &[basename1, ai1] = parser.player1(ai1_level); {}
+        const auto &[basename2, ai2] = parser.player2(ai2_level); {}
+
+        if(ai1)
         {
-            print("Connecting to player2 @ " + parser.clientURL(2));
+            players.first = std::make_unique<GameAI>(std::stoi(basename1));
+            name1 = "Bot [" + basename1 + "]";
+        }
+        else
+        {
+            players.first = std::make_unique<RemotePlayer<inputMsg, feedbackMsg>>(PlayerType::RemoteOne);
+            name1 = basename1;
+            p1 = std::make_unique<PlayerIO>(timeout, ctx, parser.clientURL(1), use_threads);
+        }
+
+        if(ai2)
+        {
+            players.second = std::make_unique<GameAI>(std::stoi(basename2));
+            name2 = "Bot [" + basename2 + "]";
+        }
+        else
+        {
+            players.second = std::make_unique<RemotePlayer<inputMsg, feedbackMsg>>(PlayerType::RemoteTwo);
+            name2 = basename2;
             p2 = std::make_unique<PlayerIO>(timeout, ctx, parser.clientURL(2), use_threads);
         }
 
         // send initial display info as rep-req
         if(use_display)
         {
-            print("Connecting to display @ " + parser.displayURL());
+            std::vector<int> port_offsets;
+
+            // if both players are local AI, run a local display
+            if(!p1 && !p2)
+            {
+                port_offsets.push_back(1);
+
+                // run display exec
+                std::stringstream cmd;
+                cmd << "python3 " << GAME_SOURCE_DIR << "/" << game << "_gui.py" << " " << DUELS_BIN_PATH
+                    << " 127.0.0.1 "
+                    << parser.port() + 3 << " "
+                    << getpid() << " &";
+                run(cmd);
+            }
+            else
+            {
+                if(p1)
+                    port_offsets.push_back(1);
+                if(p2)
+                    port_offsets.push_back(2);
+            }
+
+            //print("Connecting to display @ " + parser.displayURL());
             const std::string req(init_msg.toYAMLString(name1,name2));
             sock.bind(parser.displayURL());
-            for(int player = 1; player < (hasTwoPlayers()?3:2); ++player)
+
+            for(auto port_offset: port_offsets)
             {
-                print("Connecting shacking with display @ " + parser.shakeURL(player));
+                //print("Shacking with display @ " + parser.shakeURL(port_offset));
                 zmq::socket_t shake(ctx, zmq::socket_type::req);
-                shake.bind(parser.shakeURL(player));
+                shake.bind(parser.shakeURL(port_offset));
                 zmq::message_t zmsg(req.data(), req.length());
                 shake.send(zmsg, zmq::send_flags::none);
                 (void) shake.recv(zmsg);
@@ -118,6 +170,8 @@ public:
         }
         else
             wait(100);
+
+        return players;
     }
 
     double samplingTime() const
@@ -125,33 +179,24 @@ public:
         return rate.ms.count() *0.001;
     }
 
-    bool hasTwoPlayers() const
+    bool sync(PlayerPtr &player)
     {
-        return difficulty == 0;
+        if(player->type() == PlayerType::LocalAI)
+        {
+            player->updateInput();
+            return true;
+        }
+
+        const auto &p = (player->type() == PlayerType::RemoteOne)?p1:p2;
+
+        p->send(player->feedback);
+        const auto bond = p->waitForInput(player->input);
+        return player->feedback.state == State::ONGOING && bond == Bond::OK;
     }
 
-    int level() const
+    bool sync(PlayerPtr &player1, PlayerPtr &player2)
     {
-        return difficulty;
-    }
-
-    bool sync(const Player &player, const feedbackMsg &msg, inputMsg &player_input)
-    {
-        print("Sending state to ", player.which());
-        const auto &p = player.isPlayerOne()?p1:p2;
-        p->send(msg);
-
-        print("feedback sent -> msg.state = OnGoing", msg.state == State::ONGOING);
-        const auto bond = p->waitForInput(player_input);
-        print("Got their input ", player.isPlayerOne() ? "p1" : "p2");
-        print("bond OK", bond == Bond::OK);
-        return msg.state == State::ONGOING && bond == Bond::OK;
-    }
-
-    bool sync(const feedbackMsg &msg1, inputMsg &player1_input,
-              const feedbackMsg &msg2, inputMsg &player2_input)
-    {
-        if constexpr(use_threads)
+        /*if constexpr(use_threads)
         {
             //temptative for parallel listening - does not work
             // inform players anyway
@@ -165,36 +210,40 @@ public:
                     && msg2.state == State::ONGOING
                     && status1 == Bond::OK
                     && status2 == Bond::OK;
-        }
+        }*/
 
-        const auto ok1(sync(Player::One, msg1, player1_input));
-        const auto ok2(sync(Player::Two, msg2, player2_input));
+        const auto ok1(sync(player1));
+        const auto ok2(sync(player2));
 
         return ok1 && ok2;
     }
 
-    void registerVictory(const Player &winner, feedbackMsg &msg1, feedbackMsg &msg2)
+    void registerVictory(const PlayerPtr &winner, const PlayerPtr &loser)
     {
-        msg1.state = State::WIN_FAIR;
-        msg2.state = State::LOSE_FAIR;
-
-        if(winner.isPlayerTwo())
-            std::swap(msg1.state, msg2.state);
+        winner->feedback.state = State::WIN_FAIR;
+        loser->feedback.state = State::LOSE_FAIR;
     }
 
-    void sendResult(const displayMsg &display, feedbackMsg &msg1, feedbackMsg &msg2)
+    void sendResult(const displayMsg &display, const PlayerPtr &player1, const PlayerPtr &player2)
     {
-        if(p1->status == Bond::TIMEOUT)
+        auto &msg1(player1->feedback);
+        auto &msg2(player2->feedback);
+
+
+        if(p1)
         {
-            msg1.state = State::LOSE_TIMEOUT;
-            msg2.state = State::WIN_TIMEOUT;
-        }
-        else if(p1->status == Bond::DISCONNECT)
-        {
-            msg2.state = State::WIN_DISCONNECT;
+            if(p1->status == Bond::TIMEOUT)
+            {
+                msg1.state = State::LOSE_TIMEOUT;
+                msg2.state = State::WIN_TIMEOUT;
+            }
+            else if(p1->status == Bond::DISCONNECT)
+            {
+                msg2.state = State::WIN_DISCONNECT;
+            }
         }
 
-        if(hasTwoPlayers())
+        if(p2)
         {
             if(p2->status == Bond::TIMEOUT)
             {
@@ -216,9 +265,8 @@ public:
             sendDisplay(display, msg2.state == State::WIN_FAIR ? 2 : -2);
         }
 
-        p1->sendResult(msg1);
-        if(hasTwoPlayers())
-            p2->sendResult(msg2);
+        if(p1) p1->sendResult(msg1);
+        if(p2) p2->sendResult(msg2);
     }
 
     void wait(uint ms) const
@@ -245,7 +293,7 @@ private:
     zmq::socket_t sock;
     int difficulty = 1;
     bool use_display = true;
-    std::string name1, name2;
+    std::string name1, name2, game;
 
     Timeout timeout;
     Refresh rate;

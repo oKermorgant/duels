@@ -12,18 +12,40 @@ def read_file(filename, to_lines = True):
         return content.splitlines()
     return content
 
-def write_file(filename, content):
+def write_file(filename, content, overwrite = False):
+    
+    exists = os.path.exists(filename)
+    
+    if exists:
+        if not overwrite:
+            print('Skipping {}, file exists'.format(filename))
+            return
+        else:
+            print('Overwriting {}'.format(filename))
+    else:
+        print('Creating {}'.format(filename))
+    
     with open(filename, 'w') as f:
         if isinstance(content, str):
             f.write(content)
         else:
             f.write('\n'.join(content))
+
+        
             
 def dict_replace(s, d):
     for key in d:
-        s = s.replace('<'+key+'>', str(d[key]))
-    return s       
+        if '<'+key+'>' in s:
+            s = s.replace('<'+key+'>', str(d[key]))
+    return s
 
+def adapt(str_in, file_out, description, file_in = True, overwrite = False):
+    if file_in:
+        write_file(file_out, dict_replace(read_file(str_in, False), description), overwrite)
+    else:
+        write_file(file_out, dict_replace(str_in, description), overwrite)
+    
+    
 class Info:
     def __init__(self, key):
         self.type, key = key.split()
@@ -44,16 +66,15 @@ class Info:
             ret += loop.format(self.dim, self.name, self.dim-1)
         return ret
             
-def build_toYAMLString(detail, more = []):
-    ret = '  std::string toYAMLString({}) const \n  {{\n    std::stringstream ss;\n    '.format(', '.join(more))
+def build_print_fct(name, detail, more = []):
+    ret = '  std::string {}({}) const \n  {{\n    std::stringstream ss;\n    '.format(name, ', '.join(more))
     for i,key in enumerate([Info(key) for key in more] + detail):
         if i:
             ret += '\n    '
         ret += key.ss(i)
     return ret + '\n    return ss.str();\n  }\n'
             
-def msg_derived(name, keys, field):
-    
+def msg_derived(name, keys, field):    
     keys = [key.replace('(','[').replace(')',']') for key in keys]
     l = len(keys)
     detail = [Info(key) for key in keys]
@@ -61,11 +82,13 @@ def msg_derived(name, keys, field):
     if len(keys):
         ret += '  {};\n'.format('; '.join(keys))
     if field == 'display':
-        ret += build_toYAMLString(detail, ['int winner'])
-    if field == 'init':
-        ret += build_toYAMLString(detail, ['std::string p1', 'std::string p2'])
+        ret += build_print_fct('toYAMLString', detail, ['int winner'])
+    elif field == 'init':
+        ret += build_print_fct('toYAMLString', detail, ['std::string p1', 'std::string p2'])
+    else:
+        ret += build_print_fct('toString', detail)
         
-    elif field == 'feedback':
+    if field == 'feedback':
         ret += '  {}() {{}}\n'.format(name)
         ret += '  {}({})\n'.format(name, ', '.join(['{} _{}{}'.format(key.type, key.name, key.arr) for key in detail]))
         ret += '    : {} {{}}\n'.format(', '.join(['{key}(_{key})'.format(key=key.name) for key in detail if key.dim == 0]))
@@ -77,6 +100,7 @@ def build_headers(game, description, game_path):
     include_path = game_path + 'include/duels/'+game
     guard = game.upper() + '_MSG_H'
 
+    # generate msg.h
     header = ['#ifndef {}'.format(guard)]
     header.append('#define {}'.format(guard))
     for inc in ('sstream', 'duels/game_state.h'):
@@ -90,35 +114,120 @@ def build_headers(game, description, game_path):
         
     header.append('}\n}\n#endif')
     
-    write_file(include_path + '/msg.h', header)
+    write_file(include_path + '/msg.h', header, overwrite=True)
         
     # generate client.h
-    guard = game.upper() + '_GAME_H'
-    header = '''#ifndef {guard}
-#define {guard}
+    header = '''#ifndef <GAME>_GAME_H
+#define <GAME>_GAME_H
 #include <duels/client.h>
-#include <duels/{game}/msg.h>
+#include <duels/<game>/msg.h>
 #include <sstream>
-namespace duels {{
-namespace {game} {{
+namespace duels {
+namespace <game> {
 class Game: public duels::Client<inputMsg, feedbackMsg>
-{{
+{
 public:
   Game(int argc, char** argv, std::string name, int difficulty = 1)
-    : Game(argc, argv, name, difficulty, "localhost") {{}}
+    : Game(argc, argv, name, difficulty, "localhost") {}
   Game(int argc, char** argv, std::string name, std::string ip, int difficulty = 1)
-      : Game(argc, argv, name, difficulty, ip) {{}}
+      : Game(argc, argv, name, difficulty, ip) {}
 private:
   Game(int argc, char** argv, std::string name, int difficulty, std::string ip)
       : duels::Client<inputMsg, feedbackMsg>(
-      argc, argv, {timeout}, {server_timeout}, name, difficulty, ip, "{game}") {{}}
-}};
-}}
-}}
+      argc, argv, <timeout>, <server_timeout>, name, difficulty, ip, "<game>") {}
+};
+}
+}
 #endif'''
 
-    write_file(include_path + '/game.h', header.format(guard=guard, game=game, timeout=description['timeout'], server_timeout=description['server_timeout']))
-        
+    adapt(header, include_path + '/game.h', description, False, True)
+    
+    # generate <game>_ai.h
+    header = '''#ifndef <GAME>_AI_H
+#define <GAME>_AI_H
+
+#include <duels/player.h>
+#include <duels/<game>/msg.h>
+
+namespace duels {
+namespace <game> {
+
+// built-in AI class, should be heavily adapted to your needs
+class <Game>AI : public duels::Player<inputMsg, feedbackMsg>
+{
+public:
+  <Game>AI(int difficulty = 1) : difficulty(difficulty) {}
+
+  void computeInput()
+  {
+    // in this function the `feedback` member variable that comes from the game
+    // TODO update the `input` member variable
+    // the `difficulty` member variable that may be used to tune your AI (0 = most stupidest)
+
+  }
+
+private:
+  int difficulty = 1;
+};
+}
+}
+#endif
+'''
+    adapt(header, include_path + '/{}_ai.h'.format(game), description, False, False)
+    
+    # generate mechanics.h
+    if description['turn_based']:
+        header = '''#ifndef <GAME>_MECHANICS_H
+#define <GAME>_MECHANICS_H
+
+#include <duels/<game>/msg.h>
+
+using namespace duels::<game>;
+
+// base mechanics class, should be heavily adapted to reflect the game rules
+class <Game>Mechanics
+{
+public:
+    <Game>Mechanics() {}
+    initMsg initGame() {return {};}
+    void buildPlayerFeedback(feedbackMsg &feedback, [[maybe_unused]] bool player_1_turn)
+    {
+
+    }
+
+private:
+
+};
+
+#endif 
+'''
+    else:
+        header = '''#ifndef <GAME>_MECHANICS_H
+#define <GAME>_MECHANICS_H
+
+#include <duels/<game>/msg.h>
+
+using namespace duels::<game>;
+
+// base mechanics class, should be heavily adapted to reflect the game rules
+class <Game>Mechanics
+{
+public:
+    <Game>Mechanics() {}
+    initMsg initGame() {return {};}
+    void buildPlayerFeedbacks(feedbackMsg &feedback1, feedbackMsg &feedback2)
+    {
+
+    }
+
+private:
+
+};
+
+#endif 
+'''
+    adapt(header, include_path + '/mechanics.h', description, False, False)
+
 
 if __name__ == '__main__':
     
@@ -147,7 +256,9 @@ if __name__ == '__main__':
         description['refresh'] = description['timeout']
     if 'turn_based' not in description:
         description['turn_based'] = False
-    description['game'] = game
+    description['game'] = game.lower()
+    description['Game'] = game.title()
+    description['GAME'] = game.upper()
     description['duels_path'] = duels_path[:-1]
     
     # erase times if detected in source
@@ -172,10 +283,7 @@ if __name__ == '__main__':
     if 'server_timeout' not in description:
         description['server_timeout'] = 2*(description['timeout'] + description['refresh'])
                         
-    
-    def adapt(file_in, file_out):
-        write_file(file_out, dict_replace(read_file(file_in, False), description))
-    
+
     # create directories
     for d in ('include', 'include/duels', 'include/duels/'+game, 'client_template'):
         if not os.path.exists(game_path + d):
@@ -193,15 +301,9 @@ if __name__ == '__main__':
         elif src == 'server_turns.cpp':
             dst_path = game_path + 'server.cpp'
             
-        if os.path.exists(dst_path):
-            print('Skipping {}, file exists'.format(dst_path))
-        else:
-            adapt(duels_path + 'templates/server/' + src, dst_path)
+        adapt(duels_path + 'templates/server/' + src, dst_path, description, overwrite=False)
                 
     # copy client templates
     for src,dst in (('CMakeLists.txt','CMakeLists.txt'), ('game.cpp', game+'.cpp')):
         dst_path = game_path + 'client_template/' + dst
-        if os.path.exists(dst_path):
-            print('Skipping {}, file exists'.format(dst_path))
-        else:
-            adapt(duels_path + 'templates/client/' + src, dst_path)
+        adapt(duels_path + 'templates/client/' + src, dst_path, description, overwrite=False)

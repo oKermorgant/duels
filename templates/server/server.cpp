@@ -1,111 +1,56 @@
-#define LOCAL_GAME  // to test the game AI with a dumb player AI
-
 #include <duels/<game>/msg.h>
-#ifdef LOCAL_GAME
-#include <duels/local.h>
-#else
 #include <duels/server.h>
-#endif
+#include <duels/<game>/<game>_ai.h>
+#include <duels/<game>/mechanics.h>
 
 using namespace duels::<game>;
 using duels::Player;
 using duels::Timeout;
 using duels::Refresh;
-#ifdef LOCAL_GAME
-using GameIO = duels::LocalGame<initMsg, inputMsg, feedbackMsg, displayMsg>;
-#else
 using GameIO = duels::Server<initMsg, inputMsg, feedbackMsg, displayMsg>;
-#endif
 
 
 int main(int argc, char** argv)
 {
-  feedbackMsg feedback1, feedback2;
-  initMsg init;
-  inputMsg input1, input2;
+  GameIO game_io("<game>", Timeout(<timeout>), Refresh(<refresh>));
+  
+  // single display for both players
   displayMsg display;
-  GameIO game_io(Timeout(<timeout>), Refresh(<refresh>));
+
+  // TODO prepare game state / init message (for display)
+  <Game>Mechanics mechanics;
+  initMsg init = mechanics.initGame();
+
+  // inform players and get whether they are remote or local AI
+  auto [player1, player2] = game_io.initPlayers<<Game>AI>(argc, argv, init, 1, 1); {}
   // simulation time
-  const double dt(game_io.samplingTime());
-
-  // build initial game state
-
+  [[maybe_unused]] const double dt(game_io.samplingTime());
   
-  
-
-  // build init message for display
-  
-
-#ifdef LOCAL_GAME
-  game_io.initDisplay(init, "<game>");  // add false at the end if you run the display in another terminal
-  game_io.setLevel(1);
-#else
-  game_io.initDisplay(argc, argv, init);
-  const bool two_players = game_io.hasTwoPlayers();
-#endif
-
 
   while(true)
   {
-    // check if any regular winner
+    // TODO check if any regular winner
     if(false)
     {
-      //if(...)
-      game_io.registerVictory(Player::One, feedback1, feedback2);
+      //if(player 1 wins)
+      game_io.registerVictory(player1, player2);
       //else
-      game_io.registerVictory(Player::Two, feedback1, feedback2);
+      game_io.registerVictory(player2, player1);
     }
 
 
-    // build display information
+    // TODO build display information
 
     game_io.sendDisplay(display);
     
-    // build player 1 feedback
-
-
-    // build player 2 feedback
-
-
-
-
-#ifndef LOCAL_GAME
-    if(two_players)
-    {
-      if(!game_io.sync(feedback1, input1, feedback2, input2))
-        break;
-    }
-    else
-    {
-      // sync with player 1, exits if needed
-      if(!game_io.sync(feedback1, input1))
+    // extract feedbacks
+    mechanics.buildPlayerFeedbacks(player1->feedback, player2->feedback);
+    
+    // request player actions, exits if any disconnect / crash
+      if(!game_io.sync(player1, player2))
         break;
 
-
-#else
-      // write dumb player AI from feedback1 to input1
-      
-      
-      
-      
-
-
-#endif
-
-      // artificial opponent: put your AI here
-      
-      
-      
-      
-      
-      
-      
-
-#ifndef LOCAL_GAME
-    }
-#endif
-
-    // update game state from input1 and input2
+    // TODO update game state from player1->input and player2->input
     
     
     
@@ -113,5 +58,5 @@ int main(int argc, char** argv)
   }
 
   // final results
-  game_io.sendResult(display, feedback1, feedback2);
+  game_io.sendResult(display, player1, player2);
 }

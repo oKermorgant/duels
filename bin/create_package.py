@@ -31,7 +31,7 @@ def latest_mtime(d, ignores = []):
                 i += 1
         if len(files):
             for f in files:
-                if f not in ['CMakeLists.txt.user']:
+                if f not in ['CMakeLists.txt.user', 'client.h']:
                     f_mtime = os.stat(pjoin(directory,f)).st_mtime
                     if f_mtime > mtime:
                         mtime = f_mtime
@@ -42,15 +42,13 @@ class Game:
     
     OK = 0
     NOT_INSTALLED = 1
-    LOCAL_FLAG = 2
-    NEED_RECOMPILE = 3
-    NOT_SURE = 4
-    NEED_REINSTALL = 5
+    NEED_RECOMPILE = 2
+    NOT_SURE = 3
+    NEED_REINSTALL = 4
     
     msg = {}
     msg[OK] = 'ready to ship'
     msg[NOT_INSTALLED] = 'not installed'
-    msg[LOCAL_FLAG] = 'source has #define LOCAL_GAME'
     msg[NEED_RECOMPILE] = 'was compiled before latest changes in duels library'
     msg[NOT_SURE] = 'not checked'
     msg[NEED_REINSTALL] = 'installed version is not last one'
@@ -95,14 +93,6 @@ class Game:
         files = self.files()
         if files is None or not all(os.path.exists(f) for f in files):
             self.status = self.NOT_INSTALLED
-    
-    def check_local_flag(self):
-        with open(self.server) as f:
-            cpp = f.read().splitlines()
-        local_game = False
-        for line in cpp:
-            if '#define LOCAL_GAME' in line and not(0 <= line.find('//') < line.find('#define LOCAL_GAME')):
-                self.status = self.LOCAL_FLAG
                 
     def check_mtime(self):
         
@@ -160,7 +150,7 @@ class Game:
         return self.name
         
     def get_status(self):
-        for f in (self.check_installed, self.check_local_flag, self.check_mtime, self.check_installed_version):
+        for f in (self.check_installed, self.check_mtime, self.check_installed_version):
             if self.status == self.NOT_SURE:
                 f()
             else:
@@ -212,7 +202,7 @@ else:
     print('No games to ship')
     
 print()
-to_remove = games[Game.LOCAL_FLAG] + games[Game.NEED_RECOMPILE]
+to_remove = games[Game.NEED_RECOMPILE]
 if len(to_remove):
     r = input('Uninstall old games and create package? [Y/n] ')
     if r in ('n','N'):
@@ -272,6 +262,9 @@ with open(control_file, 'w') as f:
 run(['sudo','chown', 'root:root', '.', '-R'], cwd = deb_root)
 run(['dpkg-deb', '--build', 'duels'], cwd = pjoin(duels_path, 'deb'))
 
+versionned_name = pjoin(duels_path, 'deb', 'duels_{}.deb'.format(version))
+shutil.move(pjoin(duels_path, 'deb', 'duels.deb'), versionned_name)
+
 if install:
     print('Installing package...')
-    run(['sudo', 'dpkg', '-i', pjoin(duels_path, 'deb', 'duels.deb')])
+    run(['sudo', 'dpkg', '-i', versionned_name])
