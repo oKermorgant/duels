@@ -11,7 +11,6 @@ This framework uses up to 3 programs when playing a game:
 - the `client` is the user (or player) code, that receives the game state and sends back its input
 - the `display` is in Python and runs on the user computer. It receives display data from the game but does not send anything
 
-During development, the `client` can be embedded into the `server` to easily create the mechanics, rules and display.
 
 # Creating a new game
 
@@ -37,12 +36,13 @@ To create a new game:
 - create a yaml file with the same name, that contains the message information
 - call python <path_to_installed_duels>/bin/gen_wrapper.py <game_name>
 
-It will create the core `server.cpp` file where the game mechanics and display should be defined. 
-It also creates a `client_template` directory, to be used by actual game player
+It will create the core `server.cpp` file where the game mechanics and display should be defined.
+This is done through the created `mechanics.h` and `game_ai.h` files, to write the game rules and your local AI.
+It also creates a `client_template` directory, to be used by actual game player.
 
 ## Developing the game
 
-The `server.cpp` is the entry point for the game server. It create `mechanics.h` and `game_ai.h` to write the game rules and your local AI. This local AI should take as argument a `difficulty` parameter. The default values for player 1 and player 2 appear in `server.cpp` when creating players.
+The `server.cpp` is the entry point for the game server.  The local AI should take as argument a `difficulty` parameter. The default values for player 1 and player 2 appear in `server.cpp` when creating players.
 
 Typically, AI level 0 should have no chance to win in order to let the player test their own AI. AI level 1 may win by chance. Higher difficulty AIs should actually try to win.
 
