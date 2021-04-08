@@ -1,6 +1,6 @@
 timeout: 100 #ms
 refresh: 1000
-init: []
+init_display: []
 input: [int s]
 feedback: [int a, int b]
 display: []

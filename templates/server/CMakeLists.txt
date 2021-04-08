@@ -25,13 +25,13 @@ target_link_libraries(<game>_server ${CMAKE_THREAD_LIBS_INIT} ${ZMQ_LIBRARY})
 
 
 # install server
-install(TARGETS <game>_server DESTINATION bin)
+install(TARGETS <game>_server DESTINATION bin/<game>)
 
 # install gui and its deps
-install(FILES <game>_gui.py DESTINATION bin
+install(FILES <game>_gui.py DESTINATION bin/<game>
         PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
         
 # client headers and templates
-install(FILES include/duels/<game>/game.h include/duels/<game>/msg.h DESTINATION include/duels/<game>)
+install(FILES include/duels/<game>/game.h include/duels/<game>/msg.h <msg_detail> DESTINATION include/duels/<game>)
 install(FILES client_template/CMakeLists.txt DESTINATION games/<game>)
 install(FILES client_template/<game>.cpp DESTINATION games/<game> )

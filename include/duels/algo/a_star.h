@@ -10,10 +10,10 @@
 #include <chrono>
 #include <memory>
 
+
 namespace duels
 {
-
-namespace
+namespace a_star
 {
 // compare pointer and object
 template <class Node>
@@ -96,21 +96,22 @@ public:
 };
 }
 
+
 // templated version of A* algorithm
 template<class Node,typename Heuristic=float>
 std::vector<Node> Astar(Node start, Node goal, bool shuffle = false)
 {
-    Queue<Node,Heuristic> queue;
+    a_star::Queue<Node,Heuristic> queue;
     queue.push({&start, start.h(goal)});
 
     // keep track of who comes from who
-    Tree<Node> tree;
+    a_star::Tree<Node> tree;
 
     while(!queue.empty())
     {
         auto best = queue.top();
 
-        if(areSame(best.node, goal))
+        if(a_star::areSame(best.node, goal))
             return tree.fullPathTo(best.node);
 
         tree.close(best.node);

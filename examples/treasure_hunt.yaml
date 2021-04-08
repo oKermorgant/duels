@@ -1,0 +1,15 @@
+timeout: 100
+refresh: 300
+
+turnbased: False
+
+structs:
+    Orientation: [RIGHT, UP, LEFT, DOWN]
+    Position: [int x, int y]
+    Pose: [int x, int y, Orientation t]
+    Scan: [int x, int y, bool occupied]
+    
+init_display: [Pose pose1, Pose pose2, Position treasure, Position obs(), int height, int width]
+input: [Action action, Action: [TURN_LEFT,TURN_RIGHT,MOVE,SONAR]]
+feedback: [Pose pose, Scan scan(), float treasure_distance]
+display : [Pose pose1, Pose pose2, Position scans()]

@@ -21,6 +21,13 @@ public:
         y = p.y;
     }
 
+    template <class Position>
+    void writeInto(Position &p) const
+    {
+        p.x = x;
+        p.y = y;
+    }
+
     friend std::ostream& operator<<(std::ostream& out, const Vector2D& p)
     {
         out << "(" << p.x << ", " << p.y << ")";
@@ -28,14 +35,14 @@ public:
     }
 
     // 2 positions are equal if they have the same x and y
-    bool operator==(const Vector2D &other) const
+    inline bool operator==(const Vector2D &other) const
     {
         return x == other.x && y == other.y;
     }
-
-    bool is(const Vector2D &other) const
+    // 2 positions are equal if they have the same x and y
+    inline bool operator!=(const Vector2D &other) const
     {
-         return x == other.x && y == other.y;
+        return x != other.x || y!=other.y;
     }
 
     Numeric norm(bool use_manhattan = false) const

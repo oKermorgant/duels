@@ -1,0 +1,14 @@
+timeout: 100 #ms
+refresh: 20 #ms
+server_timeout: 15000
+
+structs:
+    Position: [int x, int y]
+    Banana: [float x, float y]
+    
+init_display: [Position gor1, Position gor2, int yb(640), int radius]
+display: [Banana banana, bool hit, float wind]
+input: [float angle, float vel]
+feedback: [Position me, Position opponent, Banana banana, int wind, int building(640)]
+
+turn_based: True

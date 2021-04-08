@@ -4,6 +4,7 @@
 #include <iostream>
 #include <duels/zmq_io.h>
 #include <duels/game_state.h>
+#include <duels/game_result.h>
 #include <duels/parser.h>
 #include <unistd.h>
 
@@ -22,18 +23,19 @@ void print(std::string s)
 }
 }
 
-template <class inputMsg, class feedbackMsg>
+template <class Input, class Feedback>
 class Client
 {
 private:
-    inputMsg input;
-    feedbackMsg feedback;
+    Input input;
+    Feedback feedback;
     zmq::context_t ctx;
     zmq::socket_t sock;
     Timeout server_timeout;
     Timeout timeout;
 
     Clock::time_point feedback_time;
+    Result you_win;
     bool looks_like_timeout = false;
 public:
 
@@ -80,8 +82,8 @@ public:
         const std::string server_dir(std::string(GAME_SOURCE_DIR) + "/build");
         const std::string gui_dir(GAME_SOURCE_DIR);
 #else
-        const std::string server_dir(DUELS_BIN_PATH);
-        const std::string gui_dir(DUELS_BIN_PATH);
+        const std::string server_dir(std::string(DUELS_BIN_PATH) + "/" + game);
+        const std::string gui_dir(server_dir);
 #endif
 
         if(parser.localServer())
@@ -91,22 +93,27 @@ public:
             // launch local game
             std::stringstream cmd;
             cmd << server_dir << "/" << game << "_server";
-            cmd << " -p " << parser.port();
             if(difficulty < 0)  // request to play as player 2
             {
                 cmd << " -n2 '" << name << "'";
                 cmd << " -n1 " << -difficulty;
+                parser.setupPlayer2();
             }
             else
             {
                 cmd << " -n1 '" << name << "'";
                 cmd << " -n2 " << difficulty;
             }
+            cmd << " -p " << parser.port();
+
             if(!parser.displayPort())
                 cmd << " --nodisplay";
             cmd << " &";
             run(cmd);
         }
+
+        // custom status messages
+        you_win = parser.isPlayer1() ? Result::P1_WINS : Result::P2_WINS;
 
         // open display for this game
         if(parser.displayPort())
@@ -126,7 +133,7 @@ public:
         sock.connect(parser.serverURL());
     }
 
-    bool get(feedbackMsg &msg)
+    bool get(Feedback &msg)
     {
         static bool first_contact(true);
 
@@ -135,45 +142,19 @@ public:
             // no timeout
             zmq::message_t zmsg;
             (void)sock.recv(zmsg);
-            msg = *(static_cast<feedbackMsg*>(zmsg.data()));
+            msg = *(static_cast<Feedback*>(zmsg.data()));
             first_contact = false;
         }
         else if(read_timeout(sock, msg, server_timeout) == Bond::DISCONNECT)
-            msg.state = State::SERVER_DISCONNECT;
+            msg.__state.set(Bond::DISCONNECT);
 
-        if(msg.state != State::ONGOING)
-        {
-            switch (msg.state)
-            {
-            case State::WIN_FAIR:
-                std::cout << "You win! Fair victory" << std::endl;
-                break;
-            case State::WIN_TIMEOUT:
-                std::cout << "You win! Opponent has timed out" << std::endl;
-                break;
-            case State::WIN_DISCONNECT:
-                std::cout << "You win! Opponent has crashed" << std::endl;
-                break;
-            case State::LOSE_FAIR:
-                std::cout << "You lose! Fair game" << std::endl;
-                break;
-            case State::LOSE_TIMEOUT:
-                std::cout << "You lose! Timed out..." << std::endl;
-                break;                
-            default:
-                std::cout << "Game has stopped - very long timeout from you or your opponent";
-                if(looks_like_timeout)
-                    std::cout << " (it looks like it could be you)";
-                std::cout << std::endl;
-                break;
-            }
+        if(result::isFinal(msg.__state, you_win, looks_like_timeout))
             return false;
-        }
         feedback_time = Clock::now();
         return true;
     }
 
-    void send(const inputMsg &msg)
+    void send(const Input &msg)
     {
         if(timeout.tooLongSince(feedback_time))
             looks_like_timeout = true;

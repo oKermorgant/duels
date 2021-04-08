@@ -5,10 +5,10 @@
 
 
 using namespace duels::<game>;
-using duels::Player;
+using duels::Result;
 using duels::Timeout;
 using duels::Refresh;
-using GameIO = duels::Server<initMsg, inputMsg, feedbackMsg, displayMsg>;
+using GameIO = duels::Server<InitDisplay, Input, Feedback, Display>;
 
 int main(int argc, char** argv)
 {
@@ -16,23 +16,19 @@ int main(int argc, char** argv)
   
   // simulation time
   [[maybe_unused]] const double dt(game_io.samplingTime());
-  // single display for both players
-  displayMsg display;
 
   // TODO prepare game state / init message (for display)
   <Game>Mechanics mechanics;
-  initMsg init = mechanics.initGame();
+  InitDisplay init = mechanics.initGame();
 
-  // inform players and get whether they are remote or local AI
-  auto [player1, player2] = game_io.initPlayers<<Game>AI>(argc, argv, init, 1, 1); {}
-
+  // inform displays and get players (no multithread by default for simultaneous games)
+  const auto [player1, player2] = game_io.initPlayers<<Game>AI>(argc, argv, init, 0, 1, false); {}
 
   bool player1_turn(true);
-  while(true)
+  while(game_io.running())
   {
     // adapt to who is playing
-    auto &current(player1_turn ? player1 : player2);
-    auto &opponent(player1_turn ? player2 : player1);
+    auto [current, opponent] = game_io.newTurn(player1_turn);
 
     // extract feedback for the current player
     mechanics.buildPlayerFeedback(current->feedback, player1_turn);
@@ -44,16 +40,18 @@ int main(int argc, char** argv)
     // TODO update game mechanics (display, winning conditions) from current->input
     // up to you!
 
-    game_io.sendDisplay(display);
+    game_io.sendDisplay(mechanics.display());
 
     // TODO check if any regular winner after this turn
-    if(false)
+    //if(...)
     {
-      //if(current player wins)
-      game_io.registerVictory(current, opponent);
-      //else
-      game_io.registerVictory(opponent, current);
-      break;
+      /* depending on the rules, you may use:
+      game_io.registerVictory(current);
+      game_io.registerVictory(opponent);
+      game_io.registerDraw();
+      game_io.endsWith(Result::P1_WINS);
+      game_io.endsWith(Result::P2_WINS);
+      */
     }
 
     // switch player
@@ -61,5 +59,5 @@ int main(int argc, char** argv)
   }
 
   // send final result to players and display
-  game_io.sendResult(display, player1, player2);
+  game_io.sendResult(mechanics.display());
 }

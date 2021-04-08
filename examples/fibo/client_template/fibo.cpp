@@ -6,8 +6,8 @@ int main(int argc, char** argv)
 {
   Game game(argc, argv, "your name");
 
-  inputMsg input;
-  feedbackMsg feedback;
+  Input input;
+  Feedback feedback;
   const auto timeout = game.timeout;
 
   while(game.get(feedback))

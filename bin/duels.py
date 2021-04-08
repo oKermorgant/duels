@@ -6,8 +6,17 @@ import threading
 import os
 
 class dict_to_obj(object):
-  def __init__(self, adict):
-    self.__dict__.update(adict)
+    def __init__(self, adict):
+        self.__dict__.update(adict)
+            
+def to_object(msg):
+    if isinstance(msg, list):
+        return [to_object(v) for v in msg]
+    elif isinstance(msg, dict):
+        for v in msg:
+            msg[v] = to_object(msg[v])
+        return dict_to_obj(msg)
+    return msg        
     
 class Subscriber:
     def __init__(self, server_timeout = 2000):
@@ -27,32 +36,37 @@ class Subscriber:
         # force pygame to quit if client has disappeared
         self.winner = 0
         self.reason = 'fair victory'
+
         if len(sys.argv) > 4:
-            threading.Thread(target=self.check_client, args=(int(sys.argv[4]),)).start()        
+            self.monitor = threading.Thread(target=self.check_client, args=(int(sys.argv[4]),))
+            self.monitor.start()
         
     def check_client(self, client_pid):
-        while True:
-            if self.winner:
-                break            
+        
+        client_up = True
+        while client_up and not self.winner:
             try:
                 os.kill(client_pid, 0)
             except OSError:
-                try:
-                    pygame.quit()
-                except:
-                    pass
-                sys.exit(0)
-            
-            time.sleep(0.1)        
+                client_up = False
+                break            
+            time.sleep(0.1)  
+        if not client_up:
+            try:          
+                pygame.display.quit()
+                pygame.quit()
+            except:
+                pass
+            sys.exit(0)
         
     def get_init(self, debug=False):        
         self.shake = self.context.socket(zmq.REP)
         self.shake.connect('tcp://{}:{}'.format(self.ip, self.port))
         #  Wait for next request from client
-        msg = yaml.safe_load(self.shake.recv())
+        msg = self.shake.recv()
         if debug:
             print(msg)
-        return dict_to_obj(msg)
+        return to_object(yaml.safe_load(msg))
     
     def ready(self):
         self.shake.send(b'ok')
@@ -60,16 +74,18 @@ class Subscriber:
         time.sleep(.1)
         
     def refresh(self, debug=False):
+        if self.winner:
+            return None
         if not len(self.poller.poll(self.server_timeout)):
             self.winner = -1
             return None
-        msg = yaml.safe_load(self.socket.recv())
-        if msg['winner']:
-            self.winner = abs(msg['winner'])
-            if msg['winner'] < 0:
-                self.reason = 'timeout'
-        msg.pop('winner')
+        msg = self.socket.recv()
         if debug:
             print(msg)
-        return dict_to_obj(msg)
+        msg = to_object(yaml.safe_load(msg))
+        self.winner = msg.result
+        return msg
+    
+    def winner_name(self, init_msg):
+        return getattr(init_msg, 'name{}'.format(self.winner))
     

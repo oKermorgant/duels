@@ -4,50 +4,45 @@
 #include <duels/<game>/mechanics.h>
 
 using namespace duels::<game>;
-using duels::Player;
+using duels::Result;
 using duels::Timeout;
 using duels::Refresh;
-using GameIO = duels::Server<initMsg, inputMsg, feedbackMsg, displayMsg>;
+using GameIO = duels::Server<InitDisplay, Input, Feedback, Display>;
 
 
 int main(int argc, char** argv)
 {
   GameIO game_io("<game>", Timeout(<timeout>), Refresh(<refresh>));
   
-  // single display for both players
-  displayMsg display;
-
   // TODO prepare game state / init message (for display)
   <Game>Mechanics mechanics;
-  initMsg init = mechanics.initGame();
+  InitDisplay init = mechanics.initGame();
 
-  // inform players and get whether they are remote or local AI
-  auto [player1, player2] = game_io.initPlayers<<Game>AI>(argc, argv, init, 1, 1); {}
+  // inform displays and get players (multithread by default for simultaneous games)
+  const auto [player1, player2] = game_io.initPlayers<<Game>AI>(argc, argv, init, 0, 1); {}
   // simulation time
   [[maybe_unused]] const double dt(game_io.samplingTime());
   
 
   while(true)
   {
-    // TODO check if any regular winner
-    if(false)
+    // extract feedbacks
+    const auto result = mechanics.buildPlayerFeedbacks(player1->feedback, player2->feedback);
+    // stop if game over
+    if(result != Result::None)
     {
-      //if(player 1 wins)
-      game_io.registerVictory(player1, player2);
-      //else
-      game_io.registerVictory(player2, player1);
+      game_io.endsWith(result);
+      break;
     }
-
-
+    
     // TODO build display information
 
-    game_io.sendDisplay(display);
+    game_io.sendDisplay(mechanics.display());
     
-    // extract feedbacks
-    mechanics.buildPlayerFeedbacks(player1->feedback, player2->feedback);
+
     
     // request player actions, exits if any disconnect / crash
-      if(!game_io.sync(player1, player2))
+      if(!game_io.syncBothPlayers())
         break;
 
     // TODO update game state from player1->input and player2->input
@@ -58,5 +53,5 @@ int main(int argc, char** argv)
   }
 
   // final results
-  game_io.sendResult(display, player1, player2);
+  game_io.sendResult(mechanics.display());
 }

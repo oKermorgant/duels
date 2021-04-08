@@ -9,12 +9,12 @@ namespace duels
 class Grid
 {
 public:
-  Grid(int _rows, int _cols) : rows(_rows), cols(_cols)
+  Grid(int _rows, int _cols, int fill = 0) : rows(_rows), cols(_cols)
   {
     grid = new int[rows*cols];
-    // init to 0
+    // init
     for(auto elem = grid; elem != grid+rows*cols; elem++)
-      *elem = 0;
+      *elem = fill;
   }
   ~Grid()
   {
@@ -54,6 +54,13 @@ public:
   {
     return inBounds(x, y) && cell(x,y) == 0;
   }
+
+  bool isFree(const Vector2D<int> &v) const
+  {
+    return inBounds(v) && cell(v) == 0;
+  }
+
+
 
   int height() {return rows;}
   int width() {return cols;}

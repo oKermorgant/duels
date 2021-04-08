@@ -18,11 +18,19 @@ During development, the `client` can be embedded into the `server` to easily cre
 ## Generation of boilerplate files
 
 For the framework, a duel game is defined by a yaml file (see examples) stating four kinds of messages:
-- init: what should be sent by the game at initialization
-- input: the expected player input
-- feedback: the feedback from the game to a player
-- display: what is required to display the state (not accessible to the player)
-Optionally, these fields can also be 
+- `init_display`: what should be sent by the game at initialization
+- `input`: the expected player input
+- `feedback`: the feedback from the game to a player
+- `display`: what is required to display the state (not accessible to the player)
+
+These messages are defined as a list of variables that will be the final structure of the message:
+- `int x` will create a `int x` member variable
+- `float x()` will create a `std::vector<float> x`
+- `float x(2)` will create `std::array<float,2> x`
+
+Custom structures can be defined in the yaml file, under the `structs` key (see `examples/treasure_hunt.yaml`). They may be:
+- A list similar to the actual messages with known C++ types (for example `Position: [int x, int y]`)
+- A list with only names, in this case a corresponding `enum class` will be generated (for example `Orientation: [RIGHT, UP, LEFT, DOWN]`)
 
 To create a new game:
 - create a folder with the name of the game
@@ -34,5 +42,7 @@ It also creates a `client_template` directory, to be used by actual game player
 
 ## Developing the game
 
-The `server.cpp` is the entry point for the game server. By default, it is generated with `#define LOCAL_GAME` that allows testing the game AI against a simulated player AI that may be as dumb or clever as you want. Actually playing against this game can only be done if this `define` is disabled.
+The `server.cpp` is the entry point for the game server. It create `mechanics.h` and `game_ai.h` to write the game rules and your local AI. This local AI should take as argument a `difficulty` parameter. The default values for player 1 and player 2 appear in `server.cpp` when creating players.
+
+Typically, AI level 0 should have no chance to win in order to let the player test their own AI. AI level 1 may win by chance. Higher difficulty AIs should actually try to win.
 

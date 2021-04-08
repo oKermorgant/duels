@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(fibo_server CXX)
 
-SET(DUELS_ROOT "../.." CACHE STRING "Path to duels dev folder")
+SET(DUELS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." CACHE STRING "Path to duels dev folder")
 set(CMAKE_INSTALL_PREFIX ${DUELS_ROOT})
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 add_compile_options(-pthread)
 find_package (Threads)
 
@@ -25,10 +25,10 @@ target_link_libraries(fibo_server ${CMAKE_THREAD_LIBS_INIT} ${ZMQ_LIBRARY})
 
 
 # install server
-install(TARGETS fibo_server DESTINATION bin)
+install(TARGETS fibo_server DESTINATION bin/fibo)
 
 # install gui and its deps
-install(FILES fibo_gui.py DESTINATION bin
+install(FILES fibo_gui.py DESTINATION bin/fibo
         PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
         
 # client headers and templates
