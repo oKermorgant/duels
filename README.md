@@ -34,7 +34,7 @@ Custom structures can be defined in the yaml file, under the `structs` key (see 
 To create a new game:
 - create a folder with the name of the game
 - create a yaml file with the same name, that contains the message information
-- call python <path_to_installed_duels>/bin/gen_wrapper.py <game_name>
+- call python <path_to_installed_duels>/bin/gen_wrapper.py inside the game folder
 
 It will create the core `server.cpp` file where the game mechanics and display should be defined.
 This is done through the created `mechanics.h` and `game_ai.h` files, to write the game rules and your local AI.
@@ -45,4 +45,3 @@ It also creates a `client_template` directory, to be used by actual game player.
 The `server.cpp` is the entry point for the game server.  The local AI should take as argument a `difficulty` parameter. The default values for player 1 and player 2 appear in `server.cpp` when creating players.
 
 Typically, AI level 0 should have no chance to win in order to let the player test their own AI. AI level 1 may win by chance. Higher difficulty AIs should actually try to win.
-

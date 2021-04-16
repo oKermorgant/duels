@@ -279,7 +279,7 @@ private:
 #include <duels/<game>/msg.h>
 
 using namespace duels::<game>;
-using duels::State;
+using duels::Result;
 
 // base mechanics class, should be heavily adapted to reflect the game rules
 class <Game>Mechanics
@@ -290,16 +290,13 @@ public:
     inline const Display& display() const {return display_msg;}
     
     // game evolution can be put here, or just save the inputs for later when building the feedbacks
-    void update(const Input &input1, const Input &input2);
+    void update(const Input &input1, const Input &input2) {}
     
     // should return who has just won, if any. May also compute display
     Result buildPlayerFeedbacks(Feedback &feedback1, Feedback &feedback2)
     {
         return Result::NONE;    // game goes on
     }
-    
-    
-    
 
 private:
   Display display_msg;
