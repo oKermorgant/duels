@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(<game>_server CXX)
 
-SET(DUELS_ROOT "<duels_path>" CACHE STRING "Path to duels dev folder")
+set(DUELS_ROOT "<duels_path>" CACHE STRING "Path to duels dev folder")
 set(CMAKE_INSTALL_PREFIX ${DUELS_ROOT})
 
 set(CMAKE_CXX_STANDARD 17)

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <algorithm>
 #include <unistd.h>
+#include <filesystem>
 
 #include <duels/zmq_io.h>
 #include <duels/game_state.h>
@@ -96,9 +97,18 @@ public:
             {
                 port_offsets.push_back(1);
 
+                // find display exec
+                auto gui_path = std::string(GAME_SOURCE_DIR) + "/" + game + "_gui.py";
+
+                if(!std::filesystem::exists(gui_path))
+                {
+                  auto server_path = std::filesystem::path(argv[0]).parent_path();
+                  gui_path = server_path.string() + "/" + game + "_gui.py";
+                }
+
                 // run display exec
                 std::stringstream cmd;
-                cmd << "python3 " << GAME_SOURCE_DIR << "/" << game << "_gui.py" << " " << DUELS_BIN_PATH
+                cmd << "python3 " << gui_path << " " << DUELS_BIN_PATH
                     << " 127.0.0.1 "
                     << parser.port() + 3 << " "
                     << getpid() << " &";
