@@ -98,17 +98,22 @@ public:
                 port_offsets.push_back(1);
 
                 // find display exec
+
+                // default to local version
                 auto gui_path = std::string(GAME_SOURCE_DIR) + "/" + game + "_gui.py";
+                std::string duels_path(DUELS_BIN_PATH);
 
                 if(!std::filesystem::exists(gui_path))
                 {
-                  auto server_path = std::filesystem::path(argv[0]).parent_path();
+                  // to installed version
+                  auto server_path = std::filesystem::absolute(argv[0]).parent_path();
                   gui_path = server_path.string() + "/" + game + "_gui.py";
+                  duels_path = server_path.parent_path().parent_path().string();
                 }
 
                 // run display exec
                 std::stringstream cmd;
-                cmd << "python3 " << gui_path << " " << DUELS_BIN_PATH
+                cmd << "python3 " << gui_path << " " << duels_path
                     << " 127.0.0.1 "
                     << parser.port() + 3 << " "
                     << getpid() << " &";
