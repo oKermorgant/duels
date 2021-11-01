@@ -60,8 +60,6 @@ public:
     return inBounds(v) && cell(v) == 0;
   }
 
-
-
   int height() {return rows;}
   int width() {return cols;}
 

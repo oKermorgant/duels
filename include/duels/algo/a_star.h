@@ -111,7 +111,7 @@ std::vector<Node> Astar(Node start, Node goal, bool shuffle = false)
     {
         auto best = queue.top();
 
-        if(a_star::areSame(best.node, goal))
+        if(best.node->isGoal(goal))
             return tree.fullPathTo(best.node);
 
         tree.close(best.node);

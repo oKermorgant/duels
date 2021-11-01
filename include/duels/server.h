@@ -216,7 +216,7 @@ public:
         endsWith(winner == p1() ? Result::P1_WINS : Result::P2_WINS);
     }
 
-    inline void registerDraw() const
+    inline void registerDraw()
     {
         endsWith(Result::DRAW);
     }

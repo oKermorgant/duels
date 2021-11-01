@@ -49,7 +49,6 @@ class Info:
         if '(' in key:  # array / vector
             self.name, dim = key.split('(')
             dim = dim[:-1]
-            print(key, self.name, dim)
             if dim:
                 self.type = 'std::array<{}, {}>'.format(self.type, dim)
             else:

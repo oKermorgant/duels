@@ -31,7 +31,7 @@ def latest_mtime(d, ignores = []):
                 i += 1
         if len(files):
             for f in files:
-                if f not in ['CMakeLists.txt.user', 'client.h']:
+                if f not in ['CMakeLists.txt.user', 'client.h'] and not f.endswith('.pdf') and not f.endswith('.yaml'):
                     f_mtime = os.stat(pjoin(directory,f)).st_mtime
                     if f_mtime > mtime:
                         mtime = f_mtime
@@ -66,7 +66,7 @@ class Game:
         Game.duels_mtime,filename = latest_mtime(pjoin(duels_path, 'include'), [game.name for game in games])
         Game.msg[Game.NEED_RECOMPILE] += ' (' + filename + ')'
         
-    def valid_source(self):
+    def valid_source(self):        
         return os.path.exists(pjoin(self.src, self.name + '.yaml')) and os.path.exists(self.server)
     
     def __str__(self):
@@ -109,7 +109,7 @@ class Game:
         server_stats = os.stat(pjoin(self.src,'build',self.binary))
         if server_stats.st_mtime < self.duels_mtime:
             self.latest = self.binary
-            self.status = self.NEED_RECOMPILE            
+            self.status = self.NEED_RECOMPILE     
             return
             
     def check_installed_version(self):
@@ -137,11 +137,6 @@ class Game:
             print('   could not find following dev files for {}: {}'.format(self.name, ', '.join(to_check.keys())))
             
         if self.latest:
-            # reinstall
-            res = input(self.name + ': latest version does not seem to be installed ({}). Install? [Y/n] '.format(self.latest))
-            if res not in ('n','N'):
-                check_output(['make', 'install'], cwd=pjoin(self.src,'build'))
-                return
             self.status = self.NEED_REINSTALL
             
     def info(self, info):
@@ -155,8 +150,16 @@ class Game:
                 f()
             else:
                 break
+            
         if self.status == self.NOT_SURE:
-            self.status = self.OK            
+            self.status = self.OK
+            
+        elif self.status in (self.NEED_RECOMPILE,self.NEED_REINSTALL):
+            # reinstall
+            res = input(self.name + ': latest version does not seem to be installed ({}). Install? [Y/n] '.format(self.latest))
+            if res not in ('n','N'):
+                check_output(['make', 'install'], cwd=pjoin(self.src,'build'))
+                self.status = self.OK
    
     def update_client(self):
         print('Updating client template for ' + self.name)
@@ -167,8 +170,8 @@ class Game:
         for line in cmake:
             if '..' in line or 'will be' in line:
                 continue
-            elif duels_path in line:
-                cmake_out.append(line.replace(duels_path, dest))
+            elif '(DUELS_ROOT' in line:
+                cmake_out.append(f'SET(DUELS_ROOT "{dest}" CACHE STRING "Path to duels installation folder")')
             else:
                 cmake_out.append(line)
         with open(client_cmake,'w') as f:
@@ -177,6 +180,9 @@ class Game:
 # check potential sources
 games = []
 for directory,subdirs,files in os.walk(duels_path + '/..'):
+    if directory.endswith('deb') or directory.endswith('examples'):
+        subdirs.clear()
+        continue
     game = Game(directory)
     if game.valid_source():
         games.append(game)
@@ -238,7 +244,7 @@ if os.path.exists(deb_root):
 os.makedirs(pkg_root)
 os.makedirs(pjoin(deb_root, 'DEBIAN'))
 
-for directory in ('bin','games','include','templates'):
+for directory in ('bin','games','include','templates','examples'):
     shutil.copytree(pjoin(duels_path, directory), pjoin(pkg_root, directory))
     
 size = check_output(['du', '-s', '--block-size=1024', deb_root])
