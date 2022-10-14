@@ -16,10 +16,31 @@ def to_object(msg):
         for v in msg:
             msg[v] = to_object(msg[v])
         return dict_to_obj(msg)
-    return msg        
+    return msg   
+
+def set_proc_name(newname):
+    from ctypes import cdll, byref, create_string_buffer
+    libc = cdll.LoadLibrary('libc.so.6')
+    buff = create_string_buffer(len(newname)+1)
+    buff.value = newname
+    libc.prctl(15, byref(buff), 0, 0, 0)
+
+def get_proc_name():
+    from ctypes import cdll, byref, create_string_buffer
+    libc = cdll.LoadLibrary('libc.so.6')
+    buff = create_string_buffer(128)
+    # 16 == PR_GET_NAME from <linux/prctl.h>
+    libc.prctl(16, byref(buff), 0, 0, 0)
+    return buff.value
+
     
 class Subscriber:
     def __init__(self, server_timeout = 2000):
+        
+        # extract gui name as <game>_gui
+        game = os.path.basename(sys.argv[0])[:-3][:15]
+        set_proc_name(game.encode())
+        
         # sys.argv begins with path to this file
         self.ip = len(sys.argv) > 2 and sys.argv[2] or '127.0.0.1'
         self.port = len(sys.argv) > 3 and int(sys.argv[3]) or 3003

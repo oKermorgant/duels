@@ -158,7 +158,7 @@ class Game:
             # reinstall
             res = input(self.name + ': latest version does not seem to be installed ({}). Install? [Y/n] '.format(self.latest))
             if res not in ('n','N'):
-                check_output(['cmake', '--build', '.', '--target','install'], cwd=pjoin(self.src,'build'))
+                check_output(['cmake', '--build', '.', '--target', 'install'], cwd=pjoin(self.src,'build'))
                 self.status = self.OK
    
     def update_client(self):
@@ -250,17 +250,17 @@ for directory in ('bin','games','include','templates','examples'):
 size = check_output(['du', '-s', '--block-size=1024', deb_root])
 print('Creating package from ' + duels_path)
 
-control = '''Package: duels
-Version: {}
+control = f'''Package: duels
+Version: {version}
 Section: Education
 Priority: optional
 Architecture: all
 Essential: no
-Installed-Size: {}
-Depends: python3-pygame, libzmq3-dev, python3-zmq
+Installed-Size: {size.decode('utf-8').split()[0]}
+Depends: python3-pygame, libzmq3-dev, python3-zmq, libyaml-cpp-dev, python3-yaml
 Maintainer: olivier.kermorgant@ec-nantes.fr
 Description: The Duels package to practice game AI's
-'''.format(version, size.decode('utf-8').split()[0])
+'''
 
 with open(control_file, 'w') as f:
     f.write(control)

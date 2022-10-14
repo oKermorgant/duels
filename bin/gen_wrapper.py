@@ -29,7 +29,6 @@ def write_file(filename, content, overwrite = False):
         else:
             f.write('\n'.join(content))
 
-
 def dict_replace(s, d):
     for key in d:
         if '<'+key+'>' in s:
@@ -59,21 +58,33 @@ class Info:
             
     def ss(self, nl):
         return 'ss << "{}{}: " << {};'.format(nl and '\\n' or '', self.name, self.name)
+    
+    def node(self):
+        return f'{self.name} = node["{self.name}"].as<{self.type}>();'
             
-def build_print_fct(name, infos, more = []):
-    ret = '  std::string {}({}) const \n  {{\n    std::stringstream ss;\n    '.format(name, ', '.join(more))
+def serialize_fct(infos, more = []):
+    ret = '  std::string serialize({}) const \n  {{\n    std::stringstream ss;\n    '.format(', '.join(more))
     for i,key in enumerate([Info(key) for key in more] + infos):
         if i:
             ret += '\n    '
         ret += key.ss(i)
     return ret + '\n    return ss.str();\n  }\n'
 
+def deserialize_fct(infos):
+    ret = '  void deserialize(const std::string &yaml)\n  {\n    const auto node{YAML::Load(yaml)};\n    '
+    for i,key in enumerate(infos):
+        if i:
+            ret += '\n    '
+        ret += key.node()
+    return ret + '\n  }\n'
 
-def build_util_struct(name, items, prefix = '', game=''):
-    
+util_structs = []
+
+def build_util_struct(name, items, prefix = '', game='', custom = []):
+        
     if any(' ' not in item for item in items): 
         # enum class, already have a ostream overload  
-        return '{}enum class {}{{{}}};'.format(prefix, name, ','.join(items)), None
+        return '{}enum class {}{{{}}};'.format(prefix, name, ','.join(items)), None, None
     
     # struct
     fields = [item.split()[1] for item in items]
@@ -98,9 +109,27 @@ def build_util_struct(name, items, prefix = '', game=''):
   return ss;
 }}
 '''.format(game=game.lower(), name=name.lower(), Name=name.title(), items=';'.join(items), stream_data = stream_data)
+
+    yaml_detail = []
+    for item in items:
+        t,attr = item.split()
+        if t in custom:
+            t = f'duels::{game}::{t}'
+        elif t == 'bool':   # yaml expects 'true' or 'false' for Booleans: load as short
+            t = 'short'
+        yaml_detail.append(f'rhs.{attr} = node["{attr}"].as<{t}>();')
+    yaml_detail = '\n    '.join(yaml_detail)
+
+    yaml_detail = f'''template<>
+struct convert<duels::{game}::{name}> \n{{
+  static bool decode(Node const& node, duels::{game}::{name} & rhs)
+  {{
+    {yaml_detail}
+    return true;
+  }}
+}};\n'''
     
-     
-    return main, detail
+    return main, detail, yaml_detail
 
 def struct_name(field):
     return field.title().replace('_','')
@@ -116,7 +145,7 @@ def core_msg_code(name, keys, field):
     
     ret = 'struct {}\n{{\n'.format(name)
     
-    # build / eject enums
+    # build / eject enums   
     infos = []
     for key in keys:
         if isinstance(key, dict):
@@ -124,23 +153,24 @@ def core_msg_code(name, keys, field):
             ret += build_util_struct(name, items, '  ')[0]
         else:
             infos.append(Info(key))
+            
+    if field == 'feedback':
+        state = 'State __state'
+        check_reserved_name('feedback', infos, (state,))
+        infos.append(Info(state))
                 
     if len(infos):
         ret += '  {}\n'.format(' '.join(info.decl() for info in infos))
         
     # check for reserved words
-    toYAML = {'init_display': ('std::string name1', 'std::string name2') ,'display': ('Result result',)}
+    toYAML = {'feedback': [], 'input': [], 'init_display': ('std::string name1', 'std::string name2') ,'display': ('Result result',)}
     
-    if field in toYAML:
-        check_reserved_name(field, infos, toYAML[field])
-        ret += build_print_fct('toYAMLString', infos, toYAML[field])
-    else:
-        ret += build_print_fct('toString', infos)
+    check_reserved_name(field, infos, toYAML[field])
+    ret += serialize_fct(infos, toYAML[field])
+    
+    if not toYAML[field]:
+        ret += deserialize_fct(infos)
 
-    if field == 'feedback':
-        state = 'State __state'
-        check_reserved_name('feedback', infos, (state,))
-        ret += '  {};\n'.format(state)
     return ret + '};\n'
 
 msg_fields = ('init_display', 'input', 'feedback', 'display')
@@ -156,19 +186,22 @@ def build_headers(game, description, game_path):
     # generate msg_detail.h
     header_detail = ['// generated from {}.yaml -- editing this file by hand is not recommended'.format(game.lower())]
     
-    includes = ('sstream', 'duels/game_state.h','duels/stream_overloads.h')
+    includes = ('sstream', 'duels/game_state.h')
     
     header.append('\n'.join('#include <{}>'.format(inc) for inc in includes))
     header.append('namespace duels {{\nnamespace {} {{'.format(game.lower()))
                                                       
+    whole_yaml_detail = []
+                                                      
     if 'structs' in description:
         header.append('\n// utility structures')
         for name, items in description['structs'].items():
-            main, detail = build_util_struct(name, items, game=game)            
+            main, detail, yaml_detail = build_util_struct(name, items, game=game, custom = list(description['structs'].keys()))
             header.append(main)
             if detail:
                 header_detail.append(detail)
-        header.append('}}}}\n\n//detail on how to stream these structures\n#include <duels/{game}/msg_detail.h>\n\n// core game messages\nnamespace duels {{\nnamespace {game} {{'.format(game=game.lower()))
+                whole_yaml_detail.append(yaml_detail)
+        header.append('}}}}\n\n//detail on how to stream these structures\n#include "msg_detail.h"\n\n// core game messages\nnamespace duels {{\nnamespace {game} {{'.format(game=game.lower()))
     
     names = []
     header.append('')
@@ -180,6 +213,9 @@ def build_headers(game, description, game_path):
     
     write_file(include_path + '/msg.h', header, overwrite=True)
     if 'structs' in description:
+        
+        header_detail.append('namespace YAML\n{{\n{}}}'.format('\n'.join(whole_yaml_detail)))
+        
         write_file(include_path + '/msg_detail.h', header_detail, overwrite=True)
         
     # generate client.h
