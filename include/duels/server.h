@@ -87,7 +87,7 @@ public:
             players[1].initRemote(basename2, ctx, parser.clientURL(2), use_threads);
         }
 
-        // send initial display info as rep-req
+        // send initial display info as req-res
         if(use_display)
         {
             std::vector<int> port_offsets;
@@ -128,7 +128,7 @@ public:
             }
 
             //print("Connecting to display @ " + parser.displayURL());
-            const std::string req(init_msg.toYAMLString(io1.name,io2.name));
+            const std::string req(init_msg.serialize(io1.name,io2.name));
             sock.bind(parser.displayURL());
 
             for(auto port_offset: port_offsets)
@@ -249,8 +249,9 @@ public:
             }
         }
 
-        // to console / used by automatic rating of players
-        result::print(final_state, io1.name, io2.name);
+        // to console for automatic rating of players
+        if(!use_display)
+          result::print(final_state, io1.name, io2.name);
         io1.state() = final_state;
         // to display, if any
         sendDisplay(display);
@@ -268,7 +269,7 @@ public:
 
         rate.sleep();
 
-        const std::string msg(display.toYAMLString(io1.state().result));
+        const std::string msg(display.serialize(io1.state().result));
         zmq::message_t zmsg(msg.data(), msg.length());
         sock.send(zmsg, zmq::send_flags::none);
     }

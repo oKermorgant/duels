@@ -1,6 +1,8 @@
 #ifndef DUELS_GAMESTATE_H
 #define DUELS_GAMESTATE_H
 
+#include <duels/stream_overloads.h>
+
 namespace duels
 {
 enum class Result:short {NONE=0, P1_WINS=1, P2_WINS=2, DRAW=3};
@@ -19,7 +21,27 @@ struct State
         return is(Result::NONE) && is(Bond::OK);
     }
 };
+}
 
+inline std::ostream& operator<<(std::ostream& ss, const duels::State &state)
+{
+  ss << "{";
+  ss << "result: " << state.result << ',';
+  ss << "bond: " << state.bond << "}";
+  return ss;
+}
+
+namespace YAML
+{
+template<>
+struct convert<duels::State> {
+  static bool decode(Node const& node, duels::State & rhs)
+  {
+    rhs.bond = node["bond"].as<duels::Bond>();
+    rhs.result = node["result"].as<duels::Result>();
+    return true;
+  }
+};
 }
 
 #endif // DUELS_GAMESTATE_H

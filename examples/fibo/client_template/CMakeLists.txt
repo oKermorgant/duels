@@ -12,10 +12,14 @@ set(CMAKE_BUILD_TYPE Debug)
 # find ZeroMQ
 find_path ( ZMQ_INCLUDE_DIR zmq.h )
 find_library ( ZMQ_LIBRARY NAMES zmq )
-include_directories(${DUELS_ROOT}/include ${ZMQ_INCLUDE_DIR})
+# find yaml-cpp
+find_package(PkgConfig)
+pkg_check_modules(YamlCpp yaml-cpp)
+
+include_directories(${DUELS_ROOT}/include ${ZMQ_INCLUDE_DIR} ${YamlCpp_INCLUDE_DIRS})
 add_definitions(-DDUELS_BIN_PATH="${DUELS_ROOT}/bin")
 
 # add whatever additional includes / libs needed for your AI
 
 add_executable(fibo fibo.cpp)
-target_link_libraries(fibo ${ZMQ_LIBRARY})
+target_link_libraries(fibo ${ZMQ_LIBRARY} yaml-cpp)

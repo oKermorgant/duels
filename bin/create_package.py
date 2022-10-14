@@ -158,7 +158,7 @@ class Game:
             # reinstall
             res = input(self.name + ': latest version does not seem to be installed ({}). Install? [Y/n] '.format(self.latest))
             if res not in ('n','N'):
-                check_output(['make', 'install'], cwd=pjoin(self.src,'build'))
+                check_output(['cmake', '--build', '.', '--target','install'], cwd=pjoin(self.src,'build'))
                 self.status = self.OK
    
     def update_client(self):

@@ -13,13 +13,21 @@ find_package (Threads)
 find_path ( ZMQ_INCLUDE_DIR zmq.h )
 find_library ( ZMQ_LIBRARY NAMES zmq )
 
-include_directories(include ${DUELS_ROOT}/include ${ZMQ_INCLUDE_DIR})
+# find yaml-cpp
+find_package(PkgConfig)
+pkg_check_modules(YamlCpp yaml-cpp)
+
 add_definitions(-DDUELS_BIN_PATH="${DUELS_ROOT}/bin")
 add_definitions(-DGAME_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DDUELS_SERVER)
 
 add_executable(<game>_server server.cpp)
-target_link_libraries(<game>_server ${CMAKE_THREAD_LIBS_INIT} ${ZMQ_LIBRARY})
+target_include_directories(<game>_server PRIVATE 
+    include
+    ${DUELS_ROOT}/include 
+    ${ZMQ_INCLUDE_DIR}
+    ${YamlCpp_INCLUDE_DIRS})
+target_link_libraries(<game>_server ${CMAKE_THREAD_LIBS_INIT} ${ZMQ_LIBRARY} yaml-cpp)
 
 # add whatever is needed to build display executable
 
