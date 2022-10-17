@@ -9,13 +9,10 @@ set(CMAKE_BUILD_TYPE Debug)
 add_compile_options(-pthread)
 find_package (Threads)
 
-# find ZeroMQ
+# find ZeroMQ and yaml-cpp for message passing
 find_path ( ZMQ_INCLUDE_DIR zmq.h )
 find_library ( ZMQ_LIBRARY NAMES zmq )
-
-# find yaml-cpp
-find_package(PkgConfig)
-pkg_check_modules(YamlCpp yaml-cpp)
+find_package(yaml-cpp)
 
 add_definitions(-DDUELS_BIN_PATH="${DUELS_ROOT}/bin")
 add_definitions(-DGAME_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
