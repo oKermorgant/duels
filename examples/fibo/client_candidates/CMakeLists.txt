@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1)
 project(fibo CXX)
 
 # will be changed when creating package - used for local testing without installation

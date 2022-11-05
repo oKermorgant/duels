@@ -39,7 +39,6 @@ public:
     {
         return x == other.x && y == other.y;
     }
-    // 2 positions are equal if they have the same x and y
     inline bool operator!=(const Vector2D &other) const
     {
         return x != other.x || y!=other.y;
@@ -48,14 +47,14 @@ public:
     Numeric norm(bool use_manhattan = false) const
     {
         if(use_manhattan)
-            return  abs(x) + abs(y);
+            return  std::abs(x) + std::abs(y);
         return sqrt(x*x + y*y);
     }
 
     Numeric distance(const Vector2D &other, bool use_manhattan = false) const
     {
         if(use_manhattan)
-            return  abs(x-other.x) + abs(y-other.y);
+            return  std::abs(x-other.x) + std::abs(y-other.y);
         return sqrt((x-other.x)*(x-other.x) + (y-other.y)*(y-other.y));
     }
 

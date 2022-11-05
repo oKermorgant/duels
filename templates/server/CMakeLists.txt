@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1)
 project(<game>_server CXX)
 
 set(DUELS_ROOT "<duels_path>" CACHE STRING "Path to duels dev folder")

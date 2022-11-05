@@ -98,11 +98,11 @@ public:
 
 
 // templated version of A* algorithm
-template<class Node,typename Heuristic=float>
-std::vector<Node> Astar(Node start, Node goal, bool shuffle = false)
+template<class Node,typename Heuristic=float,class Goal>
+std::vector<Node> Astar(const Node &start, const Goal &goal, bool shuffle = false)
 {
     a_star::Queue<Node,Heuristic> queue;
-    queue.push({&start, start.h(goal)});
+    queue.push({(Node*)(&start), start.h(goal)});
 
     // keep track of who comes from who
     a_star::Tree<Node> tree;

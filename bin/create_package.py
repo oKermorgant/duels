@@ -10,13 +10,12 @@ pjoin = os.path.join
 version = '1.1'
 duels_path = os.path.abspath(os.path.dirname(__file__) + '/..')
 dest = '/opt/duels'
-install = False
+install = '-i' in sys.argv
+clean_build = '-b' in sys.argv
 
 for i,arg in enumerate(sys.argv):
     if arg == '-d':
         dest = sys.argv[i+1]
-    elif arg == '-i':
-        install = True
     
 def latest_mtime(d, ignores = []):
     mtime = 0
@@ -31,7 +30,7 @@ def latest_mtime(d, ignores = []):
                 i += 1
         if len(files):
             for f in files:
-                if f not in ['CMakeLists.txt.user', 'client.h'] and not f.endswith('.pdf') and not f.endswith('.yaml'):
+                if f not in ['CMakeLists.txt.user', 'client.h']:
                     f_mtime = os.stat(pjoin(directory,f)).st_mtime
                     if f_mtime > mtime:
                         mtime = f_mtime
@@ -154,11 +153,19 @@ class Game:
         if self.status == self.NOT_SURE:
             self.status = self.OK
             
-        elif self.status in (self.NEED_RECOMPILE,self.NEED_REINSTALL):
+        if self.status in (self.NEED_RECOMPILE,self.NEED_REINSTALL) or (self.status==self.OK and clean_build):
             # reinstall
-            res = input(self.name + ': latest version does not seem to be installed ({}). Install? [Y/n] '.format(self.latest))
+            add = ' (will recompile from scratch)' if clean_build else ''
+            res = input(self.name + f': latest version does not seem to be installed ({self.latest}). Install{add}? [Y/n] ')
             if res not in ('n','N'):
-                check_output(['cmake', '--build', '.', '--target', 'install'], cwd=pjoin(self.src,'build'))
+                build_dir = pjoin(self.src,'build')
+
+                if clean_build:
+                    run(['rm','-rf','./*'], cwd=build_dir)
+                    check_output(['cmake','..'], cwd=build_dir)
+
+                print(f'Compiling {self.name}...')
+                check_output(['cmake', '--build', '.', '--target', 'install'], cwd=build_dir)
                 self.status = self.OK
    
     def update_client(self):
@@ -266,9 +273,11 @@ with open(control_file, 'w') as f:
     f.write(control)
 
 run(['sudo','chown', 'root:root', '.', '-R'], cwd = deb_root)
+run(['sudo','chmod', 'a+rX', '.', '-R'], cwd = pkg_root)
 run(['dpkg-deb', '--build', 'duels'], cwd = pjoin(duels_path, 'deb'))
 
-versionned_name = pjoin(duels_path, 'deb', 'duels_{}.deb'.format(version))
+distro = check_output(['lsb_release','-sc']).decode().strip()
+versionned_name = pjoin(duels_path, 'deb', f'duels_{distro}_{version}.deb'.format())
 shutil.move(pjoin(duels_path, 'deb', 'duels.deb'), versionned_name)
 
 if install:
