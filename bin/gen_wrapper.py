@@ -85,12 +85,26 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
     if any(' ' not in item for item in items): 
         # enum class, already have a ostream overload  
         return '{}enum class {}{{{}}};'.format(prefix, name, ','.join(items)), None, None
+
+    ns = f'duels::{game}::'
     
-    # struct
+    # struct, test for vectors / arrays
+    for i,item in enumerate(items):
+        if '(' in item:
+            base,subname,dim = item.replace('(',' ').split()
+            base = f'{ns}{base}'
+            dim = dim[:-1]
+            if dim:
+                items[i] = f'std::array<{base},{dim}> {subname}'
+            else:
+                items[i] = f'std::vector<{base}> {subname}'
+
     fields = [item.split()[1] for item in items]
+
     fields_eq = []
     for field in fields:
-        fields_eq.append('{field} == other.{field}'.format(field=field))
+        fields_eq.append(f'{field} == other.{field}')
+
     main = '''struct {Name}
 {{
   {items};
@@ -129,7 +143,7 @@ struct convert<duels::{game}::{name}> \n{{
   }}
 }};\n'''
     
-    return main, detail, yaml_detail
+    return main.replace(ns, ''), detail, yaml_detail
 
 def struct_name(field):
     return field.title().replace('_','')
@@ -229,10 +243,12 @@ namespace <game> {
 class Game: public duels::Client<Input, Feedback>
 {
 public:
-  Game(int argc, char** argv, std::string name, int difficulty = 1)
+  /// to play as player 1 against some AI
+  Game(int argc, char** argv, std::string name, int difficulty)
     : Game(argc, argv, name, difficulty, "localhost") {}
-  Game(int argc, char** argv, std::string name, std::string ip, int difficulty = 1)
-      : Game(argc, argv, name, difficulty, ip) {}
+  /// to play as player 2 against some AI
+  Game(int argc, char** argv, int difficulty, std::string name)
+    : Game(argc, argv, name, -difficulty, "localhost") {}
 private:
   Game(int argc, char** argv, std::string name, int difficulty, std::string ip)
       : duels::Client<Input, Feedback>(

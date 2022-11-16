@@ -91,7 +91,10 @@ class Game:
     def check_installed(self):
         files = self.files()
         if files is None or not all(os.path.exists(f) for f in files):
-            self.status = self.NOT_INSTALLED
+            if os.path.exists(f'{duels_path}/include/duels/{self.name}'):
+                self.status = self.NEED_REINSTALL
+            else:
+                self.status = self.NOT_INSTALLED
                 
     def check_mtime(self):
         
@@ -156,13 +159,14 @@ class Game:
         if self.status in (self.NEED_RECOMPILE,self.NEED_REINSTALL) or (self.status==self.OK and clean_build):
             # reinstall
             add = ' (will recompile from scratch)' if clean_build else ''
-            res = input(self.name + f': latest version does not seem to be installed ({self.latest}). Install{add}? [Y/n] ')
+            res = input(self.name + f': latest version does not seem to be installed. Install{add}? [Y/n] ')
             if res not in ('n','N'):
                 build_dir = pjoin(self.src,'build')
 
                 if clean_build:
-                    run(['rm','-rf','./*'], cwd=build_dir)
-                    check_output(['cmake','..'], cwd=build_dir)
+                    shutil.rmtree(build_dir)
+                    os.mkdir(build_dir)
+                    check_output(['cmake','..',f'-DDUELS_ROOT={duels_path}'], cwd=build_dir)
 
                 print(f'Compiling {self.name}...')
                 check_output(['cmake', '--build', '.', '--target', 'install'], cwd=build_dir)
