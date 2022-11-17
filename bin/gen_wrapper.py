@@ -12,9 +12,7 @@ def read_file(filename, to_lines = True):
 
 def write_file(filename, content, overwrite = False):
     
-    exists = os.path.exists(filename)
-    
-    if exists:
+    if os.path.exists(filename):
         if not overwrite:
             print('Skipping {}, file exists'.format(filename))
             return
@@ -23,6 +21,8 @@ def write_file(filename, content, overwrite = False):
     else:
         print('Creating {}'.format(filename))
     
+    if not os.path.exists(os.path.dirname(filename)):
+        os.mkdir(os.path.dirname(filename))
     with open(filename, 'w') as f:
         if isinstance(content, str):
             f.write(content)
@@ -187,6 +187,25 @@ def core_msg_code(name, keys, field):
 
     return ret + '};\n'
 
+
+def build_python_enums(enums, mod_file):
+
+    py = []
+
+    for enum in enums:
+        enum = enum.replace('enum class', '').split('{')
+        name = enum[0].strip()
+        items = enum[1].replace('}', ',').split(',')[:-1]
+        py.append(f'class {name}:')
+        for i,item in enumerate(items):
+            py.append(f'  {item.strip()} = {i}')
+        py.append('')
+
+    write_file(mod_file, py, overwrite=True)
+
+    write_file(os.path.dirname(mod_file) + '/__init__.py', [], overwrite=False)
+
+
 msg_fields = ('init_display', 'input', 'feedback', 'display')
 
 def build_headers(game, description, game_path):
@@ -195,18 +214,18 @@ def build_headers(game, description, game_path):
     guard = game.upper() + '_MSG_H'
 
     # generate msg.h
-    header = ['// generated from {}.yaml -- editing this file by hand is not recommended'.format(game.lower()),'#ifndef {}'.format(guard), '#define {}'.format(guard)]
+    header = [f'// generated from {game.lower()}.yaml -- editing this file by hand is not recommended',f'#ifndef {guard}', f'#define {guard}']
     
     # generate msg_detail.h
     header_detail = ['// generated from {}.yaml -- editing this file by hand is not recommended'.format(game.lower())]
     
     includes = ('sstream', 'duels/game_state.h')
     
-    header.append('\n'.join('#include <{}>'.format(inc) for inc in includes))
-    header.append('namespace duels {{\nnamespace {} {{'.format(game.lower()))
+    header.append('\n'.join(f'#include <{inc}>' for inc in includes))
+    header.append(f'namespace duels {{\nnamespace {game.lower()} {{')
                                                       
     whole_yaml_detail = []
-                                                      
+
     if 'structs' in description:
         header.append('\n// utility structures')
         for name, items in description['structs'].items():
@@ -216,7 +235,12 @@ def build_headers(game, description, game_path):
                 header_detail.append(detail)
                 whole_yaml_detail.append(yaml_detail)
         header.append('}}}}\n\n//detail on how to stream these structures\n#include "msg_detail.h"\n\n// core game messages\nnamespace duels {{\nnamespace {game} {{'.format(game=game.lower()))
-    
+
+    enums = [line for line in header if 'enum class' in line]
+
+    if len(enums):
+        build_python_enums(enums, f'{game_path}/{game}/enums.py')
+
     names = []
     header.append('')
     for field in msg_fields:        
@@ -361,24 +385,20 @@ private:
 if __name__ == '__main__':
     
     game_path = len(sys.argv) == 2 and sys.argv[1] or '.'
-    game_path = os.path.abspath(game_path) + '/'
+    game_path = os.path.abspath(game_path)
+    game = os.path.basename(game_path)
+    game_path += '/'
+    description_file = f'{game_path}{game}.yaml'
     
     # installation from this file path
     duels_path = os.path.abspath(os.path.dirname(__file__) + '/..') + '/'
-
-    description_file = ''
-    for msg in os.listdir(game_path):
-        if msg.endswith('.yaml'):
-            description_file = game_path + msg
-            game = msg.split('.')[0].lower()
-            break
         
     if game in ('algo', 'utils'):
-        print('Your game cannot be called {} as this is a reserved include folder'.format(game))
+        print(f'Your game cannot be called {game} as this is a reserved include folder')
         sys.exit(0)
         
     if description_file == '':
-        print('Could not find any game description file in {}'.format(game_path))
+        print(f'Could not find any game description file in {game_path}')
         sys.exit(0)
         
     description = {'timeout': 100, 'turn_based': False, 'game': game, 'Game': game.title().replace('_',''), 'GAME': game.upper(), 
@@ -392,7 +412,7 @@ if __name__ == '__main__':
     if 'refresh' not in description:
         description['refresh'] = description['timeout']
     if 'structs' in description:
-        description['msg_detail'] = 'include/duels/{}/msg_detail.h'.format(game)
+        description['msg_detail'] = f'include/duels/{game}/msg_detail.h'
     
     # erase times if detected in source
     if os.path.exists(game_path + 'server.cpp'):

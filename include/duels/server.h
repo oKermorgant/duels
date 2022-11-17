@@ -53,6 +53,14 @@ public:
 
   Server(std::string game, Refresh refresh, Timeout timeout) : Server(game, timeout, refresh) {}
 
+  ~Server()
+  {
+    sock.close();
+    // closing ctx seems to hang, anyway at this point we might just stop everything
+    wait(10);
+    _Exit(0);
+  }
+
   template <class GameAI>
   std::pair<PlayerPtr, PlayerPtr>
   initPlayers(int argc, char** argv, const InitDisplay &init_msg, int ai1_level, int ai2_level, bool use_threads = true)
@@ -250,10 +258,6 @@ public:
     io1.state() = final_state;
     // to display, if any
     sendDisplay(display);
-
-    // closing sock / ctx seem to hang, anyway at this point we might just stop everything
-    wait(10);
-    _Exit(0);
   }
 
   void wait(uint ms) const

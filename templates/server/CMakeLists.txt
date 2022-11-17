@@ -35,6 +35,10 @@ install(TARGETS <game>_server DESTINATION bin/<game>)
 # install gui and its deps
 install(FILES <game>_gui.py DESTINATION bin/<game>
         PERMISSIONS OWNER_WRITE OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/<game>")
+    # Python module
+    install(DIRECTORY <game> DESTINATION bin/<game>)
+endif()
         
 # client headers and templates
 install(FILES include/duels/<game>/game.h include/duels/<game>/msg.h <msg_detail> DESTINATION include/duels/<game>)
