@@ -3,12 +3,14 @@ import sys
 import yaml
 import os
 
+
 def read_file(filename, to_lines = True):
     with open(filename) as f:
         content = f.read()
     if to_lines:
         return content.splitlines()
     return content
+
 
 def write_file(filename, content, overwrite = False):
     
@@ -29,18 +31,23 @@ def write_file(filename, content, overwrite = False):
         else:
             f.write('\n'.join(content))
 
+
 def dict_replace(s, d):
     for key in d:
-        if '<'+key+'>' in s:
-            s = s.replace('<'+key+'>', str(d[key]))
+        s = s.replace('<'+key+'>', str(d[key]))
     return s
+
 
 def adapt(str_in, file_out, description, file_in = True, overwrite = False):
     if file_in:
         write_file(file_out, dict_replace(read_file(str_in, False), description), overwrite)
     else:
         write_file(file_out, dict_replace(str_in, description), overwrite)
-    
+
+
+def_types = {'int': 0, 'float': 0, 'bool': False}
+
+
 class Info:
     def __init__(self, key):
         self.type, key = key.split()
@@ -52,6 +59,12 @@ class Info:
                 self.type = 'std::array<{}, {}>'.format(self.type, dim)
             else:
                 self.type = 'std::vector<{}>'.format(self.type)
+
+    def py(self):
+        if 'std' in self.type:
+            return []
+        else:
+            return def_types[self.type]
             
     def decl(self):
         return '{} {};'.format(self.type, self.name)
@@ -62,6 +75,7 @@ class Info:
     def node(self):
         return f'{self.name} = node["{self.name}"].as<{self.type}>();'
             
+
 def serialize_fct(infos, more = []):
     ret = '  std::string serialize({}) const \n  {{\n    std::stringstream ss;\n    '.format(', '.join(more))
     for i,key in enumerate([Info(key) for key in more] + infos):
@@ -69,6 +83,7 @@ def serialize_fct(infos, more = []):
             ret += '\n    '
         ret += key.ss(i)
     return ret + '\n    return ss.str();\n  }\n'
+
 
 def deserialize_fct(infos):
     ret = '  void deserialize(const std::string &yaml)\n  {\n    const auto node{YAML::Load(yaml)};\n    '
@@ -78,12 +93,17 @@ def deserialize_fct(infos):
         ret += key.node()
     return ret + '\n  }\n'
 
+
 util_structs = []
 
+
 def build_util_struct(name, items, prefix = '', game='', custom = []):
-        
-    if any(' ' not in item for item in items): 
-        # enum class, already have a ostream overload  
+
+    def_types[name] = {}
+
+    if any(' ' not in item for item in items):
+        # enum class, already have a ostream overload
+        def_types[name] = f'{name}.{items[0]}'
         return '{}enum class {}{{{}}};'.format(prefix, name, ','.join(items)), None, None
 
     ns = f'duels::{game}::'
@@ -91,15 +111,21 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
     # struct, test for vectors / arrays
     for i,item in enumerate(items):
         if '(' in item:
-            base,subname,dim = item.replace('(',' ').split()
+            base,field,dim = item.replace('(',' ').split()
             base = f'{ns}{base}'
             dim = dim[:-1]
             if dim:
-                items[i] = f'std::array<{base},{dim}> {subname}'
+                items[i] = f'std::array<{base},{dim}> {field}'
             else:
-                items[i] = f'std::vector<{base}> {subname}'
+                items[i] = f'std::vector<{base}> {field}'
 
     fields = [item.split()[1] for item in items]
+    for item in items:
+        field_type, field = item.split()
+        if 'std::' in field_type:
+            def_types[name][field] = []
+        else:
+            def_types[name][field] = def_types[field_type]
 
     fields_eq = []
     for field in fields:
@@ -145,8 +171,10 @@ struct convert<duels::{game}::{name}> \n{{
     
     return main.replace(ns, ''), detail, yaml_detail
 
+
 def struct_name(field):
     return field.title().replace('_','')
+
 
 def check_reserved_name(field, infos, reserved):
     names = [r.split()[-1] for r in reserved]
@@ -155,11 +183,12 @@ def check_reserved_name(field, infos, reserved):
             print('\033[93mCannot generate {}: `{}` cannot be used as a member variable because this name is used for internal logic\033[0m'.format(struct_name(field), info.name))
             sys.exit(1)
 
+
 def core_msg_code(name, keys, field):
-    
+
     ret = 'struct {}\n{{\n'.format(name)
     
-    # build / eject enums   
+    # build / eject enums
     infos = []
     for key in keys:
         if isinstance(key, dict):
@@ -172,12 +201,20 @@ def core_msg_code(name, keys, field):
         state = 'State __state'
         check_reserved_name('feedback', infos, (state,))
         infos.append(Info(state))
+
+    fwd_py = name in ('InitDisplay', 'Display')
+
+    if fwd_py:
+        def_types[name] = {}
                 
     if len(infos):
         ret += '  {}\n'.format(' '.join(info.decl() for info in infos))
-        
+        if fwd_py:
+            for info in infos:
+                def_types[name][info.name] = info.py()
+
     # check for reserved words
-    toYAML = {'feedback': [], 'input': [], 'init_display': ('std::string name1', 'std::string name2') ,'display': ('Result result',)}
+    toYAML = {'feedback': [], 'input': [], 'init_display': ('std::string name1', 'std::string name2'), 'display': ('Result result',)}
     
     check_reserved_name(field, infos, toYAML[field])
     ret += serialize_fct(infos, toYAML[field])
@@ -190,23 +227,45 @@ def core_msg_code(name, keys, field):
 
 def build_python_enums(enums, mod_file):
 
+    if not len(enums):
+        return []
+
+    # get which enums are actually used in Python
+    display_types = ' '.join(description['init_display'] + description['display'])
+    change = 'structs' in description
+    while change:
+        change = False
+        for s,des in description['structs'].items():
+            if s in display_types and any([' ' in elem for elem in des]):
+                change = True
+                display_types = display_types.replace(s, str(des))
+
     py = []
+    classes = []
 
     for enum in enums:
         enum = enum.replace('enum class', '').split('{')
         name = enum[0].strip()
+        if name not in display_types:
+            continue
         items = enum[1].replace('}', ',').split(',')[:-1]
         py.append(f'class {name}:')
         for i,item in enumerate(items):
-            py.append(f'  {item.strip()} = {i}')
+            py.append(f'    {item.strip()} = {i}')
         py.append('')
+        classes.append(name)
+
+    if not len(classes):
+        return
+
+    description['enums_py'] = f'from {game}.enums import {",".join(classes)}'
 
     write_file(mod_file, py, overwrite=True)
-
     write_file(os.path.dirname(mod_file) + '/__init__.py', [], overwrite=False)
 
 
 msg_fields = ('init_display', 'input', 'feedback', 'display')
+
 
 def build_headers(game, description, game_path):
 
@@ -228,6 +287,7 @@ def build_headers(game, description, game_path):
 
     if 'structs' in description:
         header.append('\n// utility structures')
+
         for name, items in description['structs'].items():
             main, detail, yaml_detail = build_util_struct(name, items, game=game, custom = list(description['structs'].keys()))
             header.append(main)
@@ -236,16 +296,14 @@ def build_headers(game, description, game_path):
                 whole_yaml_detail.append(yaml_detail)
         header.append('}}}}\n\n//detail on how to stream these structures\n#include "msg_detail.h"\n\n// core game messages\nnamespace duels {{\nnamespace {game} {{'.format(game=game.lower()))
 
-    enums = [line for line in header if 'enum class' in line]
-
-    if len(enums):
-        build_python_enums(enums, f'{game_path}/{game}/enums.py')
+    build_python_enums([line for line in header if 'enum class' in line], f'{game_path}/{game}/enums.py')
 
     names = []
     header.append('')
-    for field in msg_fields:        
+    for field in msg_fields:
         names.append(struct_name(field))
         header.append(core_msg_code(names[-1], description[field], field))
+
         
     header.append('}}\n#endif')
     
@@ -338,14 +396,14 @@ public:
     {
 
     }
-    // TODO actually build / update display_msg from player input 
+    // TODO actually build / update display_msg from player input
     
 
 private:
   Display display_msg;
 };
 
-#endif 
+#endif
 '''
     else:
         header = '''#ifndef <GAME>_MECHANICS_H
@@ -377,10 +435,17 @@ private:
   Display display_msg;
 };
 
-#endif 
+#endif
 '''
     adapt(header, include_path + '/mechanics.h', description, False, False)
 
+def adapt_enums(d):
+    d = str(d)
+    # change string enums to actual value
+    for val in def_types.values():
+        if type(val) == str and '.' in val:
+            d = d.replace(f"'{val}'", val)
+    return d
 
 if __name__ == '__main__':
     
@@ -402,7 +467,7 @@ if __name__ == '__main__':
         sys.exit(0)
         
     description = {'timeout': 100, 'turn_based': False, 'game': game, 'Game': game.title().replace('_',''), 'GAME': game.upper(), 
-                'duels_path': duels_path[:-1], 'msg_detail': ''}
+                'duels_path': duels_path[:-1], 'msg_detail': '', 'enums_py': ''}
     for msg in msg_fields:
         description[msg] = []
     
@@ -423,7 +488,7 @@ if __name__ == '__main__':
             
             for key in check_for:
                 idx = line.find(key)
-                if idx > abs(line.find('//')):                    
+                if idx > abs(line.find('//')):
                     value = line[idx+len(key):].split(')')
                     try:
                         value = int(''.join(c for c in value[0] if c.isdigit()))
@@ -442,12 +507,15 @@ if __name__ == '__main__':
         if not os.path.exists(game_path + d):
             os.mkdir(game_path + d)
             
-    build_headers(game, description, game_path)            
+    build_headers(game, description, game_path)
+
+    description['init_msg_py'] = adapt_enums(def_types['InitDisplay'])
+    description['msg_py'] = adapt_enums(def_types['Display'])
     
     # copy server templates
     for src in ('CMakeLists.txt', description['turn_based'] and 'server_turns.cpp' or 'server.cpp', 'gui.py'):
         
-        dst_path =  game_path + src
+        dst_path = game_path + src
         
         if src == 'gui.py':
             dst_path = game_path + game + '_gui.py'
