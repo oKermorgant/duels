@@ -19,6 +19,7 @@ include/
 !include/duels/algo
 !include/duels/utils
 !include/duels/*.h
+!include/duels/*.hpp
 
 # game client templates - will be shipped in deb package if needed
 games/
