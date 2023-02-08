@@ -281,7 +281,7 @@ run(['sudo','chmod', 'a+rX', '.', '-R'], cwd = pkg_root)
 run(['dpkg-deb', '--build', 'duels'], cwd = pjoin(duels_path, 'deb'))
 
 distro = check_output(['lsb_release','-sc']).decode().strip()
-versionned_name = pjoin(duels_path, 'deb', f'duels_{distro}_{version}.deb'.format())
+versionned_name = pjoin(duels_path, 'deb', f'duels[{distro}]_{version}.deb'.format())
 shutil.move(pjoin(duels_path, 'deb', 'duels.deb'), versionned_name)
 
 if install:
