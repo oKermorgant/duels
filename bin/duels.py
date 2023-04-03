@@ -46,8 +46,8 @@ class Subscriber:
         set_proc_name(game.encode())
         
         # sys.argv begins with path to this file
-        self.ip = len(sys.argv) > 2 and sys.argv[2] or '127.0.0.1'
-        self.port = len(sys.argv) > 3 and int(sys.argv[3]) or 3003
+        self.ip = len(sys.argv) > 1 and sys.argv[1] or '127.0.0.1'
+        self.port = len(sys.argv) > 2 and int(sys.argv[2]) or 3003
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, "")
@@ -62,8 +62,8 @@ class Subscriber:
         self.winner = 0
         self.reason = 'fair victory'
 
-        if len(sys.argv) > 4:
-            self.monitor = threading.Thread(target=self.check_client, args=(int(sys.argv[4]),))
+        if len(sys.argv) > 3:
+            self.monitor = threading.Thread(target=self.check_client, args=(int(sys.argv[3]),))
             self.monitor.start()
         
     def check_client(self, client_pid):
@@ -115,3 +115,10 @@ class Subscriber:
     def winner_name(self, init_msg):
         return getattr(init_msg, 'name{}'.format(self.winner))
     
+
+# reflect values from C++ enum
+class Orientation:
+    RIGHT = 0
+    UP = 1
+    LEFT = 2
+    DOWN = 3

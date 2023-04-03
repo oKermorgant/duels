@@ -116,10 +116,11 @@ public:
 
         // run display exec
         std::stringstream cmd;
-        cmd << "python3 " << gui_path << " " << duels_path
+        cmd << "PYTHONPATH=" << duels_path << ":$PYTHONPATH python3 " << gui_path
             << " 127.0.0.1 "
             << parser.port() + 3 << " "
             << getpid() << " &";
+        //print(cmd.str());
         run(cmd);
       }
       else

@@ -27,9 +27,14 @@ These messages are defined as a list of variables that will be the final structu
 - `float x()` will create a `std::vector<float> x`
 - `float x(2)` will create `std::array<float,2> x`
 
+Built-in smart structures are also available:
+- `duels::Orientation`: can be `LEFT`, `RIGHT`, `UP`, `DOWN` and has methods to rotate
+- `duels::Position2D`: a `(x,y)` position with `int` coordinates
+- `duels::Pose2D`: a `(x,y,Orientation)` structure with `int` coordinates, that can rotate and move
+
 Custom structures can be defined in the yaml file, under the `structs` key (see `examples/treasure_hunt.yaml`). They may be:
 - A list similar to the actual messages with known C++ types (for example `Position: [int x, int y]`)
-- A list with only names, in this case a corresponding `enum class` will be generated (for example `Orientation: [RIGHT, UP, LEFT, DOWN]`)
+- A list with only names, in this case a corresponding `enum class` will be generated (for example `Cell: [FREE,OCCUPIED,UNKNOWN]`)
 
 To create a new game:
 - create a folder with the name of the game

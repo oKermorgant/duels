@@ -56,12 +56,12 @@ class Info:
             self.name, dim = key.split('(')
             dim = dim[:-1]
             if dim:
-                self.type = 'std::array<{}, {}>'.format(self.type, dim)
+                self.type = f'std::array<{self.type}, {dim}>'
             else:
-                self.type = 'std::vector<{}>'.format(self.type)
+                self.type = f'std::vector<{self.type}>'
 
     def py(self):
-        if 'std' in self.type:
+        if 'std::' in self.type or 'duels::' in self.type:
             return []
         else:
             return def_types[self.type]
@@ -112,8 +112,10 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
     for i,item in enumerate(items):
         if '(' in item:
             base,field,dim = item.replace('(',' ').split()
-            base = f'{ns}{base}'
+            if '::' not in base and base[0].isupper():
+                base = f'{ns}{base}'
             dim = dim[:-1]
+
             if dim:
                 items[i] = f'std::array<{base},{dim}> {field}'
             else:
@@ -122,7 +124,7 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
     fields = [item.split()[1] for item in items]
     for item in items:
         field_type, field = item.split()
-        if 'std::' in field_type:
+        if 'std::' in field_type or 'duels::' in field_type:
             def_types[name][field] = []
         else:
             def_types[name][field] = def_types[field_type]
@@ -138,7 +140,7 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
   {{
     return {fields_eq};
   }}
-}};'''.format(Name=name.title(), items=';'.join(items), fields_eq=' && '.join(fields_eq))
+}};'''.format(Name=name, items=';'.join(items), fields_eq=' && '.join(fields_eq))
   
     stream_data = " << ',';\n  ss << ".join('"{field}: " << {name}.{field}'.format(field=field, name=name.lower()) for field in fields);
     
@@ -148,7 +150,7 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
   ss << {stream_data} << "}}";
   return ss;
 }}
-'''.format(game=game.lower(), name=name.lower(), Name=name.title(), items=';'.join(items), stream_data = stream_data)
+'''.format(game=game.lower(), name=name.lower(), Name=name, items=';'.join(items), stream_data = stream_data)
 
     yaml_detail = []
     for item in items:
@@ -304,7 +306,17 @@ def build_headers(game, description, game_path):
         names.append(struct_name(field))
         header.append(core_msg_code(names[-1], description[field], field))
 
-        
+    # check for builtin messages
+    builtin = set()
+    for line in header:
+        while 'duels::' in line:
+            line = line.split('duels::',1)[1]
+            end = [line.find(c) for c in ' ,>&']
+            builtin.add(line[:min(e for e in end if e > 0)])
+
+    for msg in builtin:
+        header.insert(4, f'#include <duels/msg/{msg.lower()}.h>')
+
     header.append('}}\n#endif')
     
     write_file(include_path + '/msg.h', header, overwrite=True)
@@ -382,13 +394,14 @@ private:
 
 #include <duels/<game>/msg.h>
 
-using namespace duels::<game>;
+namespace duels {
+namespace <game> {
 
 // base mechanics class, should be heavily adapted to reflect the game rules
-class <Game>Mechanics
+class Mechanics
 {
 public:
-    <Game>Mechanics() {}
+    Mechanics() {}
     InitDisplay initGame() {return {};}
     inline const Display& display() const {return display_msg;}
     
@@ -402,7 +415,8 @@ public:
 private:
   Display display_msg;
 };
-
+}
+}
 #endif
 '''
     else:
@@ -411,14 +425,14 @@ private:
 
 #include <duels/<game>/msg.h>
 
-using namespace duels::<game>;
-using duels::Result;
+namespace duels {
+namespace <game> {
 
 // base mechanics class, should be heavily adapted to reflect the game rules
-class <Game>Mechanics
+class Mechanics
 {
 public:
-    <Game>Mechanics() {}
+    Mechanics() {}
     InitDisplay initGame() {return {};}
     inline const Display& display() const {return display_msg;}
     
@@ -434,6 +448,8 @@ public:
 private:
   Display display_msg;
 };
+}
+}
 
 #endif
 '''

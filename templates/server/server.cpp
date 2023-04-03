@@ -18,7 +18,7 @@ int main(int argc, char** argv)
   [[maybe_unused]] const double dt(game_io.samplingTime());
   
   // TODO prepare game state / init message (for display)
-  <Game>Mechanics mechanics;
+  Mechanics mechanics;
   InitDisplay init = mechanics.initGame();
 
   // inform displays and get players (multithread by default for simultaneous games)

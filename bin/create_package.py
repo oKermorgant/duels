@@ -65,7 +65,7 @@ class Game:
         Game.duels_mtime,filename = latest_mtime(pjoin(duels_path, 'include'), [game.name for game in games])
         Game.msg[Game.NEED_RECOMPILE] += ' (' + filename + ')'
         
-    def valid_source(self):        
+    def valid_source(self):
         return os.path.exists(pjoin(self.src, self.name + '.yaml')) and os.path.exists(self.server)
     
     def __str__(self):
@@ -121,10 +121,10 @@ class Game:
         self.latest = None
         
         # look for all installed files in the game dev folder
-        for directory, subdirs, files in os.walk(self.src):            
+        for directory, subdirs, files in os.walk(self.src):
             
             if '.git' in subdirs:
-                subdirs.pop('.git')
+                subdirs.remove('.git')
                 
             for f in list(to_check.keys()):
                 if f in files:
@@ -190,10 +190,7 @@ class Game:
 
 # check potential sources
 games = []
-for directory,subdirs,files in os.walk(duels_path + '/..'):
-    if directory.endswith('deb') or directory.endswith('examples'):
-        subdirs.clear()
-        continue
+for directory,subdirs,files in os.walk(duels_path + '/../games'):
     game = Game(directory)
     if game.valid_source():
         games.append(game)
@@ -255,8 +252,13 @@ if os.path.exists(deb_root):
 os.makedirs(pkg_root)
 os.makedirs(pjoin(deb_root, 'DEBIAN'))
 
+
+def ignore(src,files):
+    return ['__pycache__']
+
+
 for directory in ('bin','games','include','templates','examples'):
-    shutil.copytree(pjoin(duels_path, directory), pjoin(pkg_root, directory))
+    shutil.copytree(pjoin(duels_path, directory), pjoin(pkg_root, directory), ignore=ignore)
     
 size = check_output(['du', '-s', '--block-size=1024', deb_root])
 print('Creating package from ' + duels_path)

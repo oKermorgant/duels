@@ -28,12 +28,6 @@ public:
         p.y = y;
     }
 
-    friend std::ostream& operator<<(std::ostream& out, const Vector2D& p)
-    {
-        out << "(" << p.x << ", " << p.y << ")";
-        return out;
-    }
-
     // 2 positions are equal if they have the same x and y
     inline bool operator==(const Vector2D &other) const
     {
@@ -106,9 +100,8 @@ public:
       return *this;
     }
 
-    Numeric x, y;
+    Numeric x{}, y{};
 };
-
 }
 
 #endif // DUELS_POINT_H
