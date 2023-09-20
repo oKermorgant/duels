@@ -123,8 +123,8 @@ public:
     {
       killAll(game + "_gui");
       std::stringstream cmd;
-      cmd << "python3 " << gui_dir << "/" << game << "_gui.py"
-          << " " << DUELS_BIN_PATH
+      cmd << "PYTHONPATH=" << DUELS_BIN_PATH << ":$PYTHONPATH python3 "
+          << gui_dir << "/" << game << "_gui.py"
           << " " << parser.serverIP()
           << " " << parser.displayPort()
           << " " << pid << " &";

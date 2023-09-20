@@ -50,3 +50,10 @@ It also creates a `client_template` directory, to be used by actual game player.
 The `server.cpp` is the entry point for the game server.  The local AI should take as argument a `difficulty` parameter. The default values for player 1 and player 2 appear in `server.cpp` when creating players.
 
 Typically, AI level 0 should have no chance to win in order to let the player test their own AI. AI level 1 may win by chance. Higher difficulty AIs should actually try to win.
+
+## Binaries with developped games
+
+The `deb` folder contains Debian files to install the framework either in Ubuntu Focal or Jammy. It will install in `/opt/duels`.
+
+Available games are in `/opt/duels/games`. Just copy this folder to start testing your AI!
+

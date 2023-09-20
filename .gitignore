@@ -25,4 +25,5 @@ include/
 games/
 
 # deb artefacts
-deb/
+deb/duels
+

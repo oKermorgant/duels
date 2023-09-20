@@ -21,7 +21,7 @@ int main()
   duels::GridPoint start(0,0), goal(rows-1, cols-1);
   grid.cell(start) = 0;
   grid.cell(goal) = 0;
-  duels::GridPoint::configure(grid, true);
+  duels::GridPoint::setMap(grid, true);
 
   auto path = duels::Astar(start, goal, true);
 

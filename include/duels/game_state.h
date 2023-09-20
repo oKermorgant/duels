@@ -26,8 +26,8 @@ struct State
 inline std::ostream& operator<<(std::ostream& ss, const duels::State &state)
 {
   ss << "{";
-  ss << "result:" << state.result << ',';
-  ss << "bond:" << state.bond << "}";
+  ss << "result: " << state.result << ',';
+  ss << "bond: " << state.bond << "}";
   return ss;
 }
 
