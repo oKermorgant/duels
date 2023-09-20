@@ -53,7 +53,11 @@ Typically, AI level 0 should have no chance to win in order to let the player te
 
 ## Binaries with developped games
 
-The `deb` folder contains Debian files to install the framework either in Ubuntu Focal or Jammy. It will install in `/opt/duels`.
+The `deb` folder contains Debian files to install the framework either in Ubuntu Focal or Jammy. It will install in `/opt/duels` with:
+
+```
+sudo apt install /path/to/.deb
+```
 
 Available games are in `/opt/duels/games`. Just copy this folder to start testing your AI!
 
