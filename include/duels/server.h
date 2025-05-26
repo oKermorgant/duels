@@ -63,13 +63,18 @@ public:
 
   template <class GameAI>
   std::pair<PlayerPtr, PlayerPtr>
-  initPlayers(int argc, char** argv, const InitDisplay &init_msg, int ai1_level, int ai2_level, bool use_threads = true)
+  initPlayers(int argc, char** argv, const InitDisplay &init_msg,
+              int ai1_level, int ai2_level,
+              bool use_threads = true, bool cancel_cout = true)
   {
     static_assert(std::is_base_of<Player<Input, Feedback>, GameAI>::value, "Your game AI class should inherit from Player<Input, Feedback>");
 
     ArgParser parser(argc, argv);
     use_display = parser.displayPort();
     this->use_threads = use_threads;
+
+    if(cancel_cout && argc > 1)
+      std::cout.setstate(std::ios::failbit);
 
     // build players depending on name or not
     if(const auto &[basename1, ai1] = parser.extractPlayer1(ai1_level);ai1)
@@ -92,12 +97,13 @@ public:
 
     // send initial display info as req-res
     if(use_display)
-    {
+    {      
       std::vector<int> port_offsets;
 
       // if both players are local AI, run a local display
       if(!io1.isRemote() && !io2.isRemote())
       {
+        killAll(game + "_gui");
         port_offsets.push_back(1);
 
         // find display exec
@@ -227,15 +233,15 @@ public:
 
   void sendResult(const Display &display)
   {
-    const auto out1(!io1.state().is(Bond::OK));
-    const auto out2(!io2.state().is(Bond::OK));
+    const auto p1ok{io1.state() == Bond::OK};
+    const auto p2ok{io2.state() == Bond::OK};
 
     // build result if any timeout / disconnect
-    if(out1 && out2)
+    if(!p1ok && !p2ok)
       endsWith(Result::DRAW);
-    else if(out1)
+    else if(!p1ok)
       endsWith(Result::P2_WINS);
-    else if(out2)
+    else if(!p2ok)
       endsWith(Result::P1_WINS);
     endsWith(result::worstOf(io1.state().bond, io2.state().bond));
 
@@ -273,7 +279,7 @@ public:
 
     rate.sleep();
 
-    const std::string msg(display.serialize(io1.state().result));
+    const std::string msg(display.serialize(io1.state()));
     zmq::message_t zmsg(msg.data(), msg.length());
     sock.send(zmsg, zmq::send_flags::none);
   }

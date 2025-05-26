@@ -10,16 +10,16 @@ enum class Bond:short {OK=0, TIMEOUT=1, DISCONNECT=2};
 
 struct State
 {
-    Result result=Result::NONE;
-    Bond bond=Bond::OK;
-    inline void set(Result result) {this->result = result;}
-    inline void set(Bond bond) {this->bond = bond;}
-    inline bool is(Result other) const {return result == other;}
-    inline bool is(Bond other) const {return bond == other;}
-    inline bool stillInGame() const
-    {
-        return is(Result::NONE) && is(Bond::OK);
-    }
+  Result result=Result::NONE;
+  Bond bond=Bond::OK;
+  inline void set(Result result) {this->result = result;}
+  inline void set(Bond bond) {this->bond = bond;}
+  inline bool operator==(Result other) const {return result == other;}
+  inline bool operator==(Bond other) const {return bond == other;}
+  inline bool stillInGame() const
+  {
+    return result == Result::NONE && bond == Bond::OK;
+  }
 };
 }
 

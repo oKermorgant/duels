@@ -45,7 +45,7 @@ def adapt(str_in, file_out, description, file_in = True, overwrite = False):
         write_file(file_out, dict_replace(str_in, description), overwrite)
 
 
-def_types = {'int': 0, 'float': 0, 'bool': False}
+def_types = {'int': 0, 'float': 0, 'bool': False, 'short': 0}
 
 
 class Info:
@@ -67,7 +67,7 @@ class Info:
             return def_types[self.type]
             
     def decl(self):
-        return '{} {};'.format(self.type, self.name)
+        return '{} {};\n '.format(self.type, self.name)
             
     def ss(self, nl):
         return 'ss << "{}{}: " << {};'.format(nl and '\\n' or '', self.name, self.name)
@@ -104,7 +104,7 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
     if any(' ' not in item for item in items):
         # enum class, already have a ostream overload
         def_types[name] = f'{name}.{items[0]}'
-        return '{}enum class {}{{{}}};'.format(prefix, name, ','.join(items)), None, None
+        return '{}enum class {}{{{}}};'.format(prefix, name, ','.join(items)), None
 
     ns = f'duels::{game}::'
     
@@ -129,28 +129,23 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
         else:
             def_types[name][field] = def_types[field_type]
 
-    fields_eq = []
-    for field in fields:
-        fields_eq.append(f'{field} == other.{field}')
+    fields_eq = ' && '.join(f'{field} == other.{field}' for field in fields)
+    stream_data = " << ',';\n    ss << ".join('"{field}: " << {name}.{field}'.format(field=field, name=name.lower()) for field in fields)
 
-    main = '''struct {Name}
+    main = f'''struct {name}
 {{
-  {items};
-  inline bool operator==(const {Name} &other) const
+  {";\n  ".join(items)};
+  inline bool operator==(const {name} &other) const
   {{
     return {fields_eq};
   }}
-}};'''.format(Name=name, items=';'.join(items), fields_eq=' && '.join(fields_eq))
-  
-    stream_data = " << ',';\n  ss << ".join('"{field}: " << {name}.{field}'.format(field=field, name=name.lower()) for field in fields);
-    
-    detail = '''inline std::ostream& operator<<(std::ostream& ss, const duels::{game}::{Name} &{name})
-{{
-  ss << "{{";
-  ss << {stream_data} << "}}";
-  return ss;
-}}
-'''.format(game=game.lower(), name=name.lower(), Name=name, items=';'.join(items), stream_data = stream_data)
+  inline friend std::ostream& operator<<(std::ostream& ss, const {name} &{name.lower()})
+  {{
+    ss << "{{";
+    ss << {stream_data} << "}}";
+    return ss;
+  }}
+}};'''
 
     yaml_detail = []
     for item in items:
@@ -160,18 +155,17 @@ def build_util_struct(name, items, prefix = '', game='', custom = []):
         elif t == 'bool':   # yaml expects 'true' or 'false' for Booleans: load as short
             t = 'short'
         yaml_detail.append(f'rhs.{attr} = node["{attr}"].as<{t}>();')
-    yaml_detail = '\n    '.join(yaml_detail)
 
     yaml_detail = f'''template<>
 struct convert<duels::{game}::{name}> \n{{
   static bool decode(Node const& node, duels::{game}::{name} & rhs)
   {{
-    {yaml_detail}
+    {"\n    ".join(yaml_detail)}
     return true;
   }}
 }};\n'''
     
-    return main.replace(ns, ''), detail, yaml_detail
+    return main.replace(ns, ''), yaml_detail
 
 
 def struct_name(field):
@@ -216,7 +210,10 @@ def core_msg_code(name, keys, field):
                 def_types[name][info.name] = info.py()
 
     # check for reserved words
-    toYAML = {'feedback': [], 'input': [], 'init_display': ('std::string name1', 'std::string name2'), 'display': ('Result result',)}
+    toYAML = {'feedback': [],
+              'input': [],
+              'init_display': ('std::string name1', 'std::string name2'),
+              'display': ('State state',)}
     
     check_reserved_name(field, infos, toYAML[field])
     ret += serialize_fct(infos, toYAML[field])
@@ -277,26 +274,19 @@ def build_headers(game, description, game_path):
     # generate msg.h
     header = [f'// generated from {game.lower()}.yaml -- editing this file by hand is not recommended',f'#ifndef {guard}', f'#define {guard}']
     
-    # generate msg_detail.h
-    header_detail = ['// generated from {}.yaml -- editing this file by hand is not recommended'.format(game.lower())]
-    
-    includes = ('sstream', 'duels/game_state.h')
-    
-    header.append('\n'.join(f'#include <{inc}>' for inc in includes))
-    header.append(f'namespace duels {{\nnamespace {game.lower()} {{')
-                                                      
-    whole_yaml_detail = []
+    header.append('\n'.join(f'#include <{inc}>' for inc in ('sstream', 'duels/game_state.h')))
+    header.append(f'\nnamespace duels {{\nnamespace {game.lower()} {{')
+
+    yaml_convert = []
 
     if 'structs' in description:
         header.append('\n// utility structures')
 
         for name, items in description['structs'].items():
-            main, detail, yaml_detail = build_util_struct(name, items, game=game, custom = list(description['structs'].keys()))
+            main, yaml_detail = build_util_struct(name, items, game=game, custom = list(description['structs'].keys()))
             header.append(main)
-            if detail:
-                header_detail.append(detail)
-                whole_yaml_detail.append(yaml_detail)
-        header.append('}}}}\n\n//detail on how to stream these structures\n#include "msg_detail.h"\n\n// core game messages\nnamespace duels {{\nnamespace {game} {{'.format(game=game.lower()))
+            yaml_convert.append(yaml_detail)
+        header.append('\n\n// core game messages')
 
     build_python_enums([line for line in header if 'enum class' in line], f'{game_path}/{game}/enums.py')
 
@@ -315,17 +305,16 @@ def build_headers(game, description, game_path):
             builtin.add(line[:min(e for e in end if e > 0)])
 
     for msg in builtin:
-        header.insert(4, f'#include <duels/msg/{msg.lower()}.h>')
+        msg = msg.split('<')[0]
+        header.insert(4, f'#include <duels/utils/{msg.lower()}.h>')
 
-    header.append('}}\n#endif')
-    
-    write_file(include_path + '/msg.h', header, overwrite=True)
-    if 'structs' in description:
-        
-        header_detail.append('namespace YAML\n{{\n{}}}'.format('\n'.join(whole_yaml_detail)))
-        
-        write_file(include_path + '/msg_detail.h', header_detail, overwrite=True)
-        
+    header.append('}}\n')
+
+    if yaml_convert:
+        header.append('namespace YAML\n{{\n{}}}'.format('\n'.join(line for line in yaml_convert if line)))
+
+    write_file(include_path + '/msg.h', header + ['\n#endif'], overwrite=True)
+
     # generate client.h
     header = '''#ifndef <GAME>_GAME_H
 #define <GAME>_GAME_H
@@ -463,6 +452,7 @@ def adapt_enums(d):
             d = d.replace(f"'{val}'", val)
     return d
 
+
 if __name__ == '__main__':
     
     game_path = len(sys.argv) == 2 and sys.argv[1] or '.'
@@ -482,7 +472,7 @@ if __name__ == '__main__':
         print(f'Could not find any game description file in {game_path}')
         sys.exit(0)
         
-    description = {'timeout': 100, 'turn_based': False, 'game': game, 'Game': game.title().replace('_',''), 'GAME': game.upper(), 
+    description = {'timeout': 100, 'turn_based': False, 'game': game, 'Game': game.title().replace('_',''), 'GAME': game.upper(),
                 'duels_path': duels_path[:-1], 'msg_detail': '', 'enums_py': ''}
     for msg in msg_fields:
         description[msg] = []
@@ -517,7 +507,6 @@ if __name__ == '__main__':
     if 'server_timeout' not in description:
         description['server_timeout'] = 2*(description['timeout'] + description['refresh'])
                         
-
     # create directories
     for d in ('include', 'include/duels', 'include/duels/'+game, 'client_template'):
         if not os.path.exists(game_path + d):

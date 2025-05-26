@@ -46,8 +46,8 @@ class Subscriber:
         set_proc_name(game.encode())
         
         # sys.argv begins with path to this file
-        self.ip = len(sys.argv) > 1 and sys.argv[1] or '127.0.0.1'
-        self.port = len(sys.argv) > 2 and int(sys.argv[2]) or 3003
+        self.ip = sys.argv[1] if len(sys.argv) > 1 else '127.0.0.1'
+        self.port = int(sys.argv[2]) if len(sys.argv) > 2 else 3003
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, "")
@@ -109,7 +109,9 @@ class Subscriber:
         if debug:
             print(msg)
         msg = to_object(yaml.safe_load(msg))
-        self.winner = msg.result
+        self.winner = msg.state.result
+
+        self.reason = ['fair victory', 'timeout', 'disconnect'][msg.state.bond]
         return msg
     
     def winner_name(self, init_msg):

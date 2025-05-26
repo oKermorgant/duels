@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 project(<game> CXX)
 
 # will be changed when creating package - used for local testing without installation

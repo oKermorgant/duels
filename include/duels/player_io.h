@@ -11,10 +11,10 @@
 #include <duels/game_state.h>
 #include <duels/game_result.h>
 #include <duels/player.h>
+#include <duels/utils/time.h>
 
 namespace duels
 {
-using Clock = std::chrono::steady_clock;
 
 template <class Input, class Feedback>
 class RemotePlayer : public Player<Input, Feedback>

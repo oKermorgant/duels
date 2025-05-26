@@ -2,8 +2,9 @@
 #define DUELS_Vector2D_H
 
 #include <cstdlib>
-#include <iostream>
 #include <math.h>
+#include <ostream>
+#include <yaml-cpp/yaml.h>
 
 namespace duels
 {
@@ -15,10 +16,11 @@ public:
 
     Vector2D(Numeric _x=0, Numeric _y=0): x(_x), y(_y) {}
 
-    void operator=(const Vector2D &p)
+    Vector2D<Numeric>& operator=(const Vector2D &p)
     {
         x = p.x;
         y = p.y;
+        return *this;
     }
 
     template <class Position>
@@ -38,14 +40,14 @@ public:
         return x != other.x || y!=other.y;
     }
 
-    Numeric norm(bool use_manhattan = false) const
+    double norm(bool use_manhattan = false) const
     {
         if(use_manhattan)
             return  std::abs(x) + std::abs(y);
         return sqrt(x*x + y*y);
     }
 
-    Numeric distance(const Vector2D &other, bool use_manhattan = false) const
+    double distance(const Vector2D &other, bool use_manhattan = false) const
     {
         if(use_manhattan)
             return  std::abs(x-other.x) + std::abs(y-other.y);
@@ -100,8 +102,33 @@ public:
       return *this;
     }
 
+    inline friend std::ostream& operator<<(std::ostream& ss, const duels::Vector2D<Numeric> &v)
+    {
+      ss << "{";
+      ss << "x: " << v.x << ",";
+      ss << "y: " << v.y << "}";
+      return ss;
+    }
+
     Numeric x{}, y{};
+};
+
+using Position2D = Vector2D<int>;
+}
+
+namespace YAML
+{
+template<typename Numeric>
+struct convert<duels::Vector2D<Numeric>>
+{
+  static bool decode(Node const& node, duels::Vector2D<Numeric> & rhs)
+  {
+    rhs.x = node["x"].as<int>();
+    rhs.y = node["y"].as<int>();
+    return true;
+  }
 };
 }
 
-#endif // DUELS_POINT_H
+
+#endif // DUELS_Vector2D_H

@@ -25,12 +25,12 @@ inline void run(const std::stringstream &cmd)
     run(cmd.str());
 }
 
-#ifndef DUELS_SERVER
+//#ifndef DUELS_SERVER
 inline void killAll(std::string proc)
 {
   run("killall " + proc + " -9 -q");
 }
-#endif
+//#endif
 
 class ArgParser
 {

@@ -5,13 +5,18 @@ from subprocess import run, check_output
 import shutil
 import sys
 import filecmp
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-i', '--install', action='store_true', help='Installs the package', default=False)
+parser.add_argument('-d', '--dest', help='Install path', default='/opt/duels')
+parser.add_argument('-b', '--build', action='store_true', help='Rebuilds all games', default=False)
+
+args = parser.parse_args()
 
 pjoin = os.path.join
-version = '1.1'
 duels_path = os.path.abspath(os.path.dirname(__file__) + '/..')
-dest = '/opt/duels'
-install = '-i' in sys.argv
-clean_build = '-b' in sys.argv
 
 for i,arg in enumerate(sys.argv):
     if arg == '-d':
@@ -108,10 +113,10 @@ class Game:
             return
                 
         # also more recent than duels
-        server_stats = os.stat(pjoin(self.src,'build',self.binary))
-        if server_stats.st_mtime < self.duels_mtime:
+        server_bin = pjoin(self.src,'build',self.binary)
+        if not os.path.exists(server_bin) or os.stat(server_bin).st_mtime < self.duels_mtime:
             self.latest = self.binary
-            self.status = self.NEED_RECOMPILE     
+            self.status = self.NEED_RECOMPILE
             return
             
     def check_installed_version(self):
@@ -156,15 +161,18 @@ class Game:
         if self.status == self.NOT_SURE:
             self.status = self.OK
             
-        if self.status in (self.NEED_RECOMPILE,self.NEED_REINSTALL) or (self.status==self.OK and clean_build):
+        if self.status in (self.NEED_RECOMPILE,self.NEED_REINSTALL) or (self.status==self.OK and args.build):
             # reinstall
-            add = ' (will recompile from scratch)' if clean_build else ''
-            res = input(self.name + f': latest version does not seem to be installed. Install{add}? [Y/n] ')
+            add = ' (will recompile from scratch)' if args.build else ''
+            if args.build:
+                res = 'Y'
+            else:
+                res = input(self.name + f': latest version does not seem to be installed. Install{add}? [Y/n] ')
             if res not in ('n','N'):
                 build_dir = pjoin(self.src,'build')
 
-                if clean_build:
-                    shutil.rmtree(build_dir)
+                if args.build:
+                    shutil.rmtree(build_dir, ignore_errors=True)
                     os.mkdir(build_dir)
                     check_output(['cmake','..',f'-DDUELS_ROOT={duels_path}'], cwd=build_dir)
 
@@ -182,11 +190,12 @@ class Game:
             if '..' in line or 'will be' in line:
                 continue
             elif '(DUELS_ROOT' in line:
-                cmake_out.append(f'SET(DUELS_ROOT "{dest}" CACHE STRING "Path to duels installation folder")')
+                cmake_out.append(f'SET(DUELS_ROOT "{args.dest}" CACHE STRING "Path to duels installation folder")')
             else:
                 cmake_out.append(line)
         with open(client_cmake,'w') as f:
             f.write('\n'.join(cmake_out))
+
 
 # check potential sources
 games = []
@@ -234,18 +243,28 @@ for game in games[Game.OK]:
     game.update_client()
 
 deb_root = pjoin(duels_path, 'deb','duels')
-pkg_root = pjoin(deb_root, dest[1:])
-control_file = pjoin(deb_root, 'DEBIAN', 'control') 
+pkg_root = pjoin(deb_root, args.dest[1:])
+control_file = pjoin(deb_root, 'DEBIAN', 'control')
 
-if os.path.exists(control_file):
-    with open(control_file) as f:
-        version = f.read().splitlines()[1].strip().split()[-1]
-    msg = 'Previous version: ' + version
-else:
-    msg = 'No previous version'
-new_version = input(msg + ' / packaged version? [{}] '.format(version))
-if new_version != '':
-    version = new_version
+games_ok = len(games[Game.OK])+1
+new_version = None
+distro = check_output(['lsb_release','-sc']).decode().strip()
+
+prev = [f for f in os.listdir(pjoin(duels_path, 'deb')) if f.startswith(f'duels[{distro}]')]
+
+if prev:
+    prev_version = max(prev).split('_')[1][:-4]
+    msg = 'Previous version: ' + prev_version
+    prev_version = [int(v) for v in prev_version.split('.')]
+    if prev_version[0] == games_ok:
+        prev_version[-1] += 1
+        new_version = '.'.join(map(str,prev_version))
+
+if new_version is None:
+    new_version = f'{games_ok}.0.0'
+new_version_user = input(f'{msg} / packaged version? [{new_version}] ')
+if new_version_user != '':
+    new_version = new_version_user
 
 if os.path.exists(deb_root):
     run(['sudo','rm','-rf',deb_root])
@@ -264,7 +283,7 @@ size = check_output(['du', '-s', '--block-size=1024', deb_root])
 print('Creating package from ' + duels_path)
 
 control = f'''Package: duels
-Version: {version}
+Version: {new_version}
 Section: Education
 Priority: optional
 Architecture: all
@@ -272,7 +291,7 @@ Essential: no
 Installed-Size: {size.decode('utf-8').split()[0]}
 Depends: python3-pygame, libzmq3-dev, python3-zmq, libyaml-cpp-dev, python3-yaml
 Maintainer: olivier.kermorgant@ec-nantes.fr
-Description: The Duels package to practice game AI's
+Description: \tThe Duels package to practice game AI's
 '''
 
 with open(control_file, 'w') as f:
@@ -282,10 +301,9 @@ run(['sudo','chown', 'root:root', '.', '-R'], cwd = deb_root)
 run(['sudo','chmod', 'a+rX', '.', '-R'], cwd = pkg_root)
 run(['dpkg-deb', '--build', 'duels'], cwd = pjoin(duels_path, 'deb'))
 
-distro = check_output(['lsb_release','-sc']).decode().strip()
-versionned_name = pjoin(duels_path, 'deb', f'duels[{distro}]_{version}.deb'.format())
+versionned_name = pjoin(duels_path, 'deb', f'duels[{distro}]_{new_version}.deb'.format())
 shutil.move(pjoin(duels_path, 'deb', 'duels.deb'), versionned_name)
 
-if install:
+if args.install:
     print('Installing package...')
     run(['sudo', 'dpkg', '-i', versionned_name])

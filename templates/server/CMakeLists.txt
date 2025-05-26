@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 project(<game>_server CXX)
 
 set(DUELS_ROOT "<duels_path>" CACHE STRING "Path to duels dev folder")
@@ -41,6 +41,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/<game>")
 endif()
         
 # client headers and templates
-install(FILES include/duels/<game>/game.h include/duels/<game>/msg.h <msg_detail> DESTINATION include/duels/<game>)
+install(FILES include/duels/<game>/game.h include/duels/<game>/msg.h DESTINATION include/duels/<game>)
 install(FILES client_template/CMakeLists.txt DESTINATION games/<game>)
 install(FILES client_template/<game>.cpp DESTINATION games/<game> )
