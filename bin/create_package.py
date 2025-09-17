@@ -186,11 +186,13 @@ class Game:
         with open(client_cmake) as f:
             cmake = f.read().splitlines()
         cmake_out = []
+        root_dir_done = False
         for line in cmake:
-            if '..' in line or 'will be' in line:
+            if 'local dev' in line:
                 continue
-            elif '(DUELS_ROOT' in line:
+            elif '(DUELS_ROOT' in line and not root_dir_done:
                 cmake_out.append(f'SET(DUELS_ROOT "{args.dest}" CACHE STRING "Path to duels installation folder")')
+                root_dir_done = True
             else:
                 cmake_out.append(line)
         with open(client_cmake,'w') as f:

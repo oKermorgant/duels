@@ -1,10 +1,21 @@
 cmake_minimum_required(VERSION 3.5)
 project(<game> CXX)
 
-# will be changed when creating package - used for local testing without installation
+# local dev, will be changed when creating package - used for local testing without installation
 SET(DUELS_ROOT "<duels_path>" CACHE STRING "Path to duels installation folder")
-add_definitions(-DGAME_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/..")
+add_definitions(-DGAME_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/..")  # local dev
 include_directories(../include) # local dev
+
+if(NOT EXISTS ${DUELS_ROOT})
+  # try home directory or assume relative path
+  if(EXISTS("$ENV{HOME}/duels"))
+    SET(DUELS_ROOT "$ENV{HOME}/duels")
+  else()
+    SET(DUELS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+  endif()
+endif()
+message(STATUS "Using ${DUELS_ROOT} as framework base folder")
+
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Debug)

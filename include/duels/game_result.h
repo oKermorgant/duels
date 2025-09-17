@@ -59,7 +59,7 @@ inline bool isFinal(State state, Result you_win, bool looks_like_timeout)
   if(state.stillInGame())
     return false;
 
-  if(state.is(you_win))
+  if(state == you_win)
   {
     std::cout << "You win! ";
     switch(state.bond)
@@ -75,11 +75,11 @@ inline bool isFinal(State state, Result you_win, bool looks_like_timeout)
         break;
     }
   }
-  else if(state.is(Result::DRAW))
+  else if(state == Result::DRAW)
   {
     std::cout << "It is a draw" << std::endl;
   }
-  else if(state.is(Result::NONE))
+  else if(state == Result::NONE)
   {
     std::cout << "Game has stopped - very long timeout from you or your opponent";
     if(looks_like_timeout)
