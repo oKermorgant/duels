@@ -9,6 +9,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('-s', '--same', action='store_true', help='Keeps the same version', default=False)
 parser.add_argument('-i', '--install', action='store_true', help='Installs the package', default=False)
 parser.add_argument('-d', '--dest', help='Install path', default='/opt/duels')
 parser.add_argument('-b', '--build', action='store_true', help='Rebuilds all games', default=False)
@@ -258,8 +259,10 @@ if prev:
     prev_version = max(prev).split('_')[1][:-4]
     msg = 'Previous version: ' + prev_version
     prev_version = [int(v) for v in prev_version.split('.')]
+
     if prev_version[0] == games_ok:
-        prev_version[-1] += 1
+        if not args.same:
+            prev_version[-1] += 1
         new_version = '.'.join(map(str,prev_version))
 
 if new_version is None:

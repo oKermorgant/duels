@@ -43,4 +43,4 @@ endif()
 # client headers and templates
 install(FILES include/duels/<game>/game.h include/duels/<game>/msg.h DESTINATION include/duels/<game>)
 install(FILES client_template/CMakeLists.txt DESTINATION games/<game>)
-install(FILES client_template/<game>.cpp DESTINATION games/<game> )
+install(FILES client_template/<game>.cpp client_template/tests.cpp DESTINATION games/<game> )

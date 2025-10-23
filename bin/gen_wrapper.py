@@ -530,6 +530,8 @@ if __name__ == '__main__':
         adapt(duels_path + 'templates/server/' + src, dst_path, description, overwrite=False)
                 
     # copy client templates
-    for src,dst in (('CMakeLists.txt','CMakeLists.txt'), ('game.cpp', game+'.cpp')):
+    for src,dst in (('CMakeLists.txt','CMakeLists.txt'),
+                    ('game.cpp', game+'.cpp'),
+                    ('tests.cpp', 'tests.cpp')):
         dst_path = game_path + 'client_template/' + dst
         adapt(duels_path + 'templates/client/' + src, dst_path, description, overwrite=False)
