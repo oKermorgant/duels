@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 <enums_py>
-# add other imports here /(e.g. pygame)
+# add other imports here
 
 # remove everything about msg_from_cpp when testing is over
 msg_from_cpp = True  # make it False to allow running the gui with manually-written messages
@@ -10,6 +10,7 @@ if msg_from_cpp:
 
     # normal behavior
     from duels import Subscriber
+    # will initialize pygame
     game = Subscriber(<server_timeout>)
     init_msg = game.get_init()
 
@@ -30,7 +31,7 @@ else:
 
     init_msg = <init_msg_py>
 
-
+import pygame
 
 
 # prepare initial state / display

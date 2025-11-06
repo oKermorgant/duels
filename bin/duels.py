@@ -39,13 +39,19 @@ def get_proc_name():
 
     
 class Subscriber:
-    def __init__(self, server_timeout = 2000, ignore_warnings = True):
+    def __init__(self, server_timeout = 2000,
+                 pygame_init = ['display', 'font'],
+                 ignore_warnings = True):
 
         # silence pygame
         os.environ['PYGAME_HIDE_SUPPORT_PROMPT']='1'
         if ignore_warnings:
             import warnings
             warnings.filterwarnings("ignore", category=RuntimeWarning)
+        # actually silence pygame, no sound
+        import pygame
+        for mod in pygame_init:
+            getattr(pygame, mod).init()
         
         # extract gui name as <game>_gui
         game = os.path.basename(sys.argv[0])[:-3][:15]

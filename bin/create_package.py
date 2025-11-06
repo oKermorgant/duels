@@ -19,10 +19,6 @@ args = parser.parse_args()
 pjoin = os.path.join
 duels_path = os.path.abspath(os.path.dirname(__file__) + '/..')
 
-for i,arg in enumerate(sys.argv):
-    if arg == '-d':
-        dest = sys.argv[i+1]
-    
 def latest_mtime(d, ignores = []):
     mtime = 0
     latest_file = ''
@@ -142,14 +138,14 @@ class Game:
                 break
             
         if len(to_check):
-            print('   could not find following dev files for {}: {}'.format(self.name, ', '.join(to_check.keys())))
+            print(f'   could not find following dev files for {self.name}: {", ".join(to_check.keys())}')
             
         if self.latest:
             self.status = self.NEED_REINSTALL
             
     def info(self, info):
         if info in (self.NEED_RECOMPILE, self.NEED_REINSTALL):
-            return '{} ({})'.format(self.name, self.latest)
+            return f'{self.name} ({self.latest})'
         return self.name
         
     def get_status(self):
@@ -175,7 +171,10 @@ class Game:
                 if args.build:
                     shutil.rmtree(build_dir, ignore_errors=True)
                     os.mkdir(build_dir)
-                    check_output(['cmake','..',f'-DDUELS_ROOT={duels_path}'], cwd=build_dir)
+                    check_output(['cmake','..',f'-DDUELS_ROOT={duels_path}', '-DCMAKE_BUILD_TYPE=Release'], cwd=build_dir)
+
+                client_dir = pjoin(duels_path, 'games', self.name)
+                shutil.rmtree(client_dir, ignore_errors=True)
 
                 print(f'Compiling {self.name}...')
                 check_output(['cmake', '--build', '.', '--target', 'install'], cwd=build_dir)
@@ -220,10 +219,10 @@ games = dict((status, [game for game in games if game.status == status]) for sta
 # print summary
 for status in Game.msg:
     if len(games[status]):
-        print('- {}: {}'.format(Game.msg[status], ', '.join(game.info(status) for game in games[status])))
+        print(f'- {Game.msg[status]}: {", ".join(game.info(status) for game in games[status])}')
 print()
 if len(games[Game.OK]):
-    print('Will ship with {} '.format(', '.join(game.name for game in games[Game.OK])))
+    print(f'Will ship with {", ".join(game.name for game in games[Game.OK])} ')
 else:
     print('No games to ship')
     
@@ -306,7 +305,7 @@ run(['sudo','chown', 'root:root', '.', '-R'], cwd = deb_root)
 run(['sudo','chmod', 'a+rX', '.', '-R'], cwd = pkg_root)
 run(['dpkg-deb', '--build', 'duels'], cwd = pjoin(duels_path, 'deb'))
 
-versionned_name = pjoin(duels_path, 'deb', f'duels[{distro}]_{new_version}.deb'.format())
+versionned_name = pjoin(duels_path, 'deb', f'duels[{distro}]_{new_version}.deb')
 shutil.move(pjoin(duels_path, 'deb', 'duels.deb'), versionned_name)
 
 if args.install:
