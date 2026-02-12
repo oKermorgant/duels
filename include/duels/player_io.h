@@ -20,7 +20,7 @@ template <class Input, class Feedback>
 class RemotePlayer : public Player<Input, Feedback>
 {
     using Player<Input, Feedback>::feedback;
-    using Player<Input, Feedback>::input;
+    using Player<Input, Feedback>::input;	
     zmq::socket_t sock;
     Timeout &timeout;
 
@@ -53,6 +53,10 @@ enum class PlayerTurn{WAIT, PLAY, STOP};
 template <class Input, class Feedback>
 class PlayerIO
 {
+
+  using State = duels::State;
+  using Result = duels::Result;
+  using Bond = duels::Bond;
 
 public:
     std::unique_ptr<Player<Input, Feedback>> ai;

@@ -123,8 +123,8 @@ struct convert<duels::Vector2D<Numeric>>
 {
   static bool decode(Node const& node, duels::Vector2D<Numeric> & rhs)
   {
-    rhs.x = node["x"].as<int>();
-    rhs.y = node["y"].as<int>();
+    rhs.x = node["x"].as<Numeric>();
+    rhs.y = node["y"].as<Numeric>();
     return true;
   }
 };

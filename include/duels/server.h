@@ -4,9 +4,7 @@
 #include <vector>
 #include <chrono>
 #include <thread>
-#include <string.h>
 #include <iostream>
-#include <algorithm>
 #include <unistd.h>
 #include <filesystem>
 
@@ -44,6 +42,9 @@ class Server
 {
   using PlayerPtr = Player<Input, Feedback>*;
   using Interface = PlayerIO<Input, Feedback>;
+  using Result = duels::Result;
+  using Bond = duels::Bond;
+  using State = duels::State;
 
 public:
 

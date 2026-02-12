@@ -18,7 +18,7 @@ int main(int argc, char** argv)
   [[maybe_unused]] const double dt(game_io.samplingTime());
 
   // TODO prepare game state / init message (for display)
-  <Game>Mechanics mechanics;
+  Mechanics mechanics;
   InitDisplay init = mechanics.initGame();
 
   // inform displays and get players (no multithread by default for simultaneous games)
@@ -37,8 +37,8 @@ int main(int argc, char** argv)
     if(!game_io.sync(current))
       break;
 
-    // TODO update game mechanics (display, winning conditions) from current->input
-    // up to you!
+    // update game mechanics (display, winning conditions) from current->input
+    const auto result = mechanics.play(current->input);
 
     game_io.sendDisplay(mechanics.display());
 

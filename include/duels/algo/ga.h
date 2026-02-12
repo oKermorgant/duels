@@ -1,5 +1,5 @@
-#ifndef GA_H
-#define GA_H
+#ifndef DUELS_GA_H
+#define DUELS_GA_H
 
 #include <vector>
 #include <thread>
@@ -100,4 +100,4 @@ public:
   }
 };
 }
-#endif // GA_H
+#endif // DUELS_GA_H

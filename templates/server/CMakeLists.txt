@@ -18,7 +18,7 @@ add_definitions(-DDUELS_BIN_PATH="${DUELS_ROOT}/bin")
 add_definitions(-DGAME_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DDUELS_SERVER)
 
-add_executable(<game>_server server.cpp)
+add_executable(<game>_server server.cpp src/<game>_ai.cpp src/mechanics.cpp)
 target_include_directories(<game>_server PRIVATE 
     include
     ${DUELS_ROOT}/include 

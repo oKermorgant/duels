@@ -266,10 +266,10 @@ def build_python_enums(enums, mod_file):
 msg_fields = ('init_display', 'input', 'feedback', 'display')
 
 
-def build_headers(game, description, game_path):
+def build_cpp_files(game, description, game_path):
 
     include_path = game_path + 'include/duels/'+game
-    guard = game.upper() + '_MSG_H'
+    guard = f'DUELS_{game.upper()}_MSG_H'
 
     # generate msg.h
     header = [f'// generated from {game.lower()}.yaml -- editing this file by hand is not recommended',f'#ifndef {guard}', f'#define {guard}']
@@ -344,8 +344,8 @@ private:
     adapt(header, include_path + '/game.h', description, False, True)
     
     # generate <game>_ai.h
-    header = '''#ifndef <GAME>_AI_H
-#define <GAME>_AI_H
+    ai_header = '''#ifndef DUELS_<GAME>_AI_H
+#define DUELS_<GAME>_AI_H
 
 #include <duels/player.h>
 #include <duels/<game>/msg.h>
@@ -357,15 +357,9 @@ namespace <game> {
 class <Game>AI : public duels::Player<Input, Feedback>
 {
 public:
-  <Game>AI(int difficulty = 1) : difficulty(difficulty) {}
+  <Game>AI(int difficulty = 1);
 
-  void updateInput()
-  {
-    // in this function the `feedback` member variable was updated from the game
-    // TODO update the `input` member variable
-    // the `difficulty` member variable may be used to tune your AI (0 = most stupidest)
-    // do not hesitate to create a .cpp file if this function is long
-  }
+  void updateInput();
 
 private:
   int difficulty = 1;
@@ -374,12 +368,36 @@ private:
 }
 #endif
 '''
-    adapt(header, include_path + '/{}_ai.h'.format(game), description, False, False)
+    adapt(ai_header, include_path + f'/{game}_ai.h', description, False, False)
+
+    # corresponding cpp file
+    ai_src = '''#include <duels/<game>/<game>_ai.h>
+
+using namespace duels;
+using namespace duels::<game>;
+
+<Game>AI::<Game>AI(int difficulty) : difficulty(difficulty)
+{
+
+}
+
+void <Game>AI::updateInput()
+{
+// in this function the `feedback` member variable was updated from the game
+// TODO update the `input` member variable
+// the `difficulty` member variable may be used to tune your AI (0 = most stupidest)
+// do not hesitate to create a .cpp file if this function is long
+}
+
+    '''
+    adapt(ai_src, f'{game_path}/src/{game}_ai.cpp', description, False, False)
+
     
-    # generate mechanics.h
+    # generate mechanics files
     if description['turn_based']:
-        header = '''#ifndef <GAME>_MECHANICS_H
-#define <GAME>_MECHANICS_H
+
+        mecha_header = '''#ifndef DUELS_<GAME>_MECHANICS_H
+#define DUELS_<GAME>_MECHANICS_H
 
 #include <duels/<game>/msg.h>
 
@@ -390,15 +408,14 @@ namespace <game> {
 class Mechanics
 {
 public:
-    Mechanics() {}
+    Mechanics();
     InitDisplay initGame() {return {};}
     inline const Display& display() const {return display_msg;}
     
-    void buildPlayerFeedback(Feedback &feedback, [[maybe_unused]] bool player_1_turn)
-    {
+    void buildPlayerFeedback(Feedback &feedback, [[maybe_unused]] bool player_1_turn);
 
-    }
     // TODO actually build / update display_msg from player input
+    Result play(const Input & input);
     
 
 private:
@@ -408,9 +425,34 @@ private:
 }
 #endif
 '''
+
+        # corresponding cpp file
+        mecha_src = '''#include <duels/<game>/mechanics.h>
+
+using namespace duels;
+using namespace duels::<game>;
+
+Mechanics::Mechanics()
+{
+
+}
+
+// game evolution can be put here, or just save the inputs for later when building the feedbacks
+void Mechanics::buildPlayerFeedback(Feedback &feedback, [[maybe_unused]] bool player_1_turn)
+{
+
+}
+
+ // should return who has just won, if any. May also compute display
+Result Mechanics::play(const Input & input)
+{
+    return Result::NONE;    // game goes on
+}
+'''
+
     else:
-        header = '''#ifndef <GAME>_MECHANICS_H
-#define <GAME>_MECHANICS_H
+        mecha_header = '''#ifndef DUELS_<GAME>_MECHANICS_H
+#define DUELS_<GAME>_MECHANICS_H
 
 #include <duels/<game>/msg.h>
 
@@ -421,18 +463,13 @@ namespace <game> {
 class Mechanics
 {
 public:
-    Mechanics() {}
+    Mechanics();
     InitDisplay initGame() {return {};}
     inline const Display& display() const {return display_msg;}
     
-    // game evolution can be put here, or just save the inputs for later when building the feedbacks
-    void update(const Input &input1, const Input &input2) {}
+    void update(const Input &input1, const Input &input2);
     
-    // should return who has just won, if any. May also compute display
-    Result buildPlayerFeedbacks(Feedback &feedback1, Feedback &feedback2)
-    {
-        return Result::NONE;    // game goes on
-    }
+    Result buildPlayerFeedbacks(Feedback &feedback1, Feedback &feedback2);
 
 private:
   Display display_msg;
@@ -442,7 +479,34 @@ private:
 
 #endif
 '''
-    adapt(header, include_path + '/mechanics.h', description, False, False)
+
+        # corresponding cpp file
+        mecha_src = '''#include <duels/<game>/mechanics.h>
+
+using namespace duels;
+using namespace duels::<game>;
+
+Mechanics::Mechanics()
+{
+
+}
+
+// game evolution can be put here, or just save the inputs for later when building the feedbacks
+void Mechanics::update(const Input &input1, const Input &input2)
+{
+
+}
+
+ // should return who has just won, if any. May also compute display
+Result Mechanics::buildPlayerFeedbacks(Feedback &feedback1, Feedback &feedback2)
+{
+    return Result::NONE;    // game goes on
+}
+'''
+    adapt(mecha_header, include_path + '/mechanics.h', description, False, False)
+    adapt(mecha_src, f'{game_path}/src/mechanics.cpp', description, False, False)
+
+
 
 def adapt_enums(d):
     d = str(d)
@@ -512,7 +576,7 @@ if __name__ == '__main__':
         if not os.path.exists(game_path + d):
             os.mkdir(game_path + d)
             
-    build_headers(game, description, game_path)
+    build_cpp_files(game, description, game_path)
 
     description['init_msg_py'] = adapt_enums(def_types['InitDisplay'])
     description['msg_py'] = adapt_enums(def_types['Display'])
